@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import { SENDING_SOP } from "@/data/coldEmailBenchmarks";
-import type { SendMonth, SendSegment, SendingPlan } from "@/lib/coldEmailRoi";
-import { formatCount, formatInteger } from "@/lib/format";
+import type { SendMonth, SendingPlan } from "@/lib/coldEmailRoi";
+import { formatInteger } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Lines } from "./Lines";
 
@@ -13,14 +13,14 @@ interface MonthCard {
 
 const close = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
 
-/** Month 1, Month 2, ... then "Month N onward" once the plan runs at the full target. */
+/** Month 1, Month 2, ... then "Month N onwards" once the plan runs at the full target. */
 function cardsFor(plan: SendingPlan): MonthCard[] {
   const cards: MonthCard[] = [];
   for (const m of plan.months) {
     const full =
       plan.prospectsPerMonth > 0 && close(m.prospects, plan.prospectsPerMonth) && close(m.sent, plan.prospectsPerMonth * SENDING_SOP.emailsPerProspect);
     if (full) {
-      cards.push({ title: `Month ${m.month} onward`, month: m, ongoing: true });
+      cards.push({ title: `Month ${m.month} onwards`, month: m, ongoing: true });
       break;
     }
     cards.push({ title: `Month ${m.month}`, month: m, ongoing: false });
@@ -37,10 +37,50 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function sendingLine(seg: SendSegment, locale: string) {
-  const days = seg.fromDay === 1 && seg.toDay === SENDING_SOP.daysPerMonth ? "Every day" : `Days ${seg.fromDay} to ${seg.toDay}`;
-  if (seg.idsSending === 0) return `${days}: no sending yet`;
-  return `${days}: ${formatInteger(seg.idsSending, locale)} ids, ${formatCount(seg.newProspectsPerDay, locale)} new prospects a day`;
+/** What the campaigns do in a month: last month's follow ups finishing, then any new list launched. */
+function campaignLines(plan: SendingPlan, month: SendMonth, locale: string): string[] {
+  const days = SENDING_SOP.daysPerMonth;
+  const monthStart = (month.month - 1) * days + 1;
+  const monthEnd = month.month * days;
+  const n = (v: number) => formatInteger(v, locale);
+  const dayOf = (abs: number) => abs - (Math.ceil(abs / days) - 1) * days;
+  // "day 8" in this month, "next month, day 8" after it.
+  const when = (abs: number) => {
+    const m = Math.ceil(abs / days);
+    if (m === month.month) return `day ${dayOf(abs)}`;
+    return m === month.month + 1 ? `next month, day ${dayOf(abs)}` : `month ${m}, day ${dayOf(abs)}`;
+  };
+  // "days 15 to 20" inside one month, "day 20 to next month, day 8" across months.
+  const range = (from: number, to: number) =>
+    Math.ceil(from / days) === Math.ceil(to / days) && Math.ceil(from / days) === month.month
+      ? from === to
+        ? `day ${dayOf(from)}`
+        : `days ${dayOf(from)} to ${dayOf(to)}`
+      : `${when(from)} to ${when(to)}`;
+  const lines: string[] = [];
+
+  const firstLaunch = plan.campaigns[0]?.launchDay ?? Infinity;
+  if (firstLaunch > monthStart && firstLaunch <= monthEnd + 1) {
+    lines.push(`Days 1 to ${Math.min(dayOf(firstLaunch - 1), days)}: ids warm up, nothing sent`);
+  }
+
+  for (const c of plan.campaigns) {
+    if (c.launchDay < monthStart && c.followUpsTo !== null && c.followUpsTo >= monthStart) {
+      const launchedIn = Math.ceil(c.launchDay / days);
+      const whose = launchedIn === month.month - 1 ? "last month's list" : `month ${launchedIn}'s list`;
+      lines.push(`Days 1 to ${dayOf(Math.min(c.followUpsTo, monthEnd))}: follow ups for ${whose}`);
+    }
+  }
+
+  for (const c of plan.campaigns.filter((x) => x.launchDay >= monthStart && x.launchDay <= monthEnd)) {
+    const allIds = c.ids === plan.ids ? `all ${n(c.ids)} ids` : `${n(c.ids)} ids`;
+    lines.push(`Day ${dayOf(c.launchDay)}: new list of ${n(c.listSize)} prospects on ${allIds}`);
+    lines.push(`First emails to all of them: ${range(c.firstEmailsFrom, c.firstEmailsTo)} (up to ${n(c.firstEmailsPerDay)} a day)`);
+    if (c.followUpsFrom !== null && c.followUpsTo !== null) {
+      lines.push(`Then ${SENDING_SOP.emailsPerProspect - 1} follow ups, ${SENDING_SOP.followUpGapDays} days apart: ${range(c.followUpsFrom, c.followUpsTo)}`);
+    }
+  }
+  return lines;
 }
 
 interface Props {
@@ -90,8 +130,8 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
                     `All ${n(month.idsSendingAtEnd)} ids live`
                   )}
                 </Section>
-                <Section label="Sending">
-                  <Lines items={month.segments.map((s) => sendingLine(s, locale))} />
+                <Section label="Campaigns">
+                  <Lines className="space-y-1" items={campaignLines(rampPlan, month, locale)} />
                 </Section>
               </div>
               <div className="mt-4 border-t border-border pt-3">

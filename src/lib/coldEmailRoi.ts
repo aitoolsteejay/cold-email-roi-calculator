@@ -38,12 +38,23 @@ export interface MonthPoint {
   profit: number;
 }
 
-/** A run of days within one month where the same ids start the same number of new prospects a day. */
-export interface SendSegment {
-  fromDay: number;
-  toDay: number;
-  idsSending: number;
-  newProspectsPerDay: number;
+/**
+ * One campaign launch: a list of prospects loaded onto a group of ids.
+ * Days are counted from day 1 of the plan (day 31 is month 2, day 1).
+ */
+export interface Campaign {
+  launchDay: number;
+  ids: number;
+  listSize: number;
+  /** Most first emails these ids can send in a day (ids x 25). */
+  firstEmailsPerDay: number;
+  firstEmailsFrom: number;
+  firstEmailsTo: number;
+  /** First and last day a follow up went out, within the plan. Null when none did. */
+  followUpsFrom: number | null;
+  followUpsTo: number | null;
+  /** True when every follow up for this list went out before the plan ended. */
+  complete: boolean;
 }
 
 export interface SendMonth {
@@ -52,13 +63,12 @@ export interface SendMonth {
   idsAdded: number;
   /** Last warm-up day for the ids added this month, or 0 when none were added. */
   warmupUntilDay: number;
-  /** Ids sending on the last day of the month. */
+  /** Ids able to send on the last day of the month. */
   idsSendingAtEnd: number;
   /** New prospects who got their first email this month. */
   prospects: number;
   /** All emails sent this month: first emails plus follow ups. */
   sent: number;
-  segments: SendSegment[];
 }
 
 export interface SendingPlan {
@@ -69,6 +79,9 @@ export interface SendingPlan {
   /** Average emails per day at full speed. */
   emailsPerDay: number;
   months: SendMonth[];
+  campaigns: Campaign[];
+  /** Longest delay, in days, of any follow up past its due date. 0 means every follow up went out on time. */
+  maxFollowUpDelayDays: number;
   totalProspects: number;
   totalSent: number;
 }
@@ -251,52 +264,122 @@ export function calculateInfrastructure(monthlyProspectTarget: number, sop = SEN
 
 /**
  * Day by day plan over the duration, following the ramp in SENDING_SOP.
- * Each day, live ids start new prospects (target / 30, capped at 150 a month per live id),
- * and every earlier prospect gets its follow ups 5, 10 and 15 days after the first email.
- * Daily sends never go above live ids x 25.
+ *
+ * How Myntmore runs campaigns:
+ * - When ids go live they get a list, sized at the target split evenly across all ids (about 150 per id).
+ * - Every prospect on the list gets the first email before any follow up is sent, at up to 25 emails per id a day.
+ * - Follow ups go out 5 days after the previous email. They only slip when the day's capacity is used up.
+ * - Each id gets a new list every 30 days from the day it went live.
  */
 export function calculateSendingPlan(monthlyProspectTarget: number, durationMonths: number, sop = SENDING_SOP): SendingPlan {
   const infra = calculateInfrastructure(monthlyProspectTarget, sop);
   const months = Math.max(0, Math.floor(safeNumber(durationMonths)));
   const totalDays = months * sop.daysPerMonth;
-  const targetPerDay = infra.prospectsPerMonth / sop.daysPerMonth;
-  const perIdPerDay = sop.prospectsPerIdPerMonth / sop.daysPerMonth;
-  const firstBatch = infra.domains * sop.firstBatchIds;
-  const secondBatch = infra.domains * (sop.idsPerDomain - sop.firstBatchIds);
-  const firstLiveDay = sop.warmupDays + 1;
-  const secondLiveDay = (sop.secondBatchMonth - 1) * sop.daysPerMonth + sop.warmupDays + 1;
-  const followUpOffsets = Array.from({ length: sop.emailsPerProspect - 1 }, (_, i) => (i + 1) * sop.followUpGapDays);
+  const listPerId = infra.ids > 0 ? infra.prospectsPerMonth / infra.ids : 0;
+  const batches = [
+    { ids: infra.domains * sop.firstBatchIds, addedMonth: 1, liveDay: sop.warmupDays + 1 },
+    {
+      ids: infra.domains * (sop.idsPerDomain - sop.firstBatchIds),
+      addedMonth: sop.secondBatchMonth,
+      liveDay: (sop.secondBatchMonth - 1) * sop.daysPerMonth + sop.warmupDays + 1,
+    },
+  ].filter((b) => b.ids > 0);
 
-  // newOnDay[d] = prospects whose first email goes out on day d (1-based).
-  const newOnDay: number[] = new Array(totalDays + 1).fill(0);
-  const plan: SendMonth[] = [];
-
-  for (let m = 1; m <= months; m++) {
-    const segments: SendSegment[] = [];
-    let prospects = 0;
-    let sent = 0;
-    const idsAdded = (m === 1 ? firstBatch : 0) + (m === sop.secondBatchMonth ? secondBatch : 0);
-    for (let dayOfMonth = 1; dayOfMonth <= sop.daysPerMonth; dayOfMonth++) {
-      const day = (m - 1) * sop.daysPerMonth + dayOfMonth;
-      const idsSending = (day >= firstLiveDay ? firstBatch : 0) + (day >= secondLiveDay ? secondBatch : 0);
-      const followUps = followUpOffsets.reduce((t, off) => t + (day - off >= 1 ? newOnDay[day - off] : 0), 0);
-      const capacity = idsSending * sop.emailsPerIdPerDay;
-      const fresh = Math.max(0, Math.min(targetPerDay, idsSending * perIdPerDay, capacity - followUps));
-      newOnDay[day] = fresh;
-      prospects += fresh;
-      sent += fresh + Math.min(followUps, capacity);
-
-      const last = segments[segments.length - 1];
-      if (last && last.idsSending === idsSending && last.newProspectsPerDay === fresh) last.toDay = dayOfMonth;
-      else segments.push({ fromDay: dayOfMonth, toDay: dayOfMonth, idsSending, newProspectsPerDay: fresh });
-    }
-    const idsSendingAtEnd = segments[segments.length - 1]?.idsSending ?? 0;
-    plan.push({ month: m, idsAdded, warmupUntilDay: idsAdded > 0 ? sop.warmupDays : 0, idsSendingAtEnd, prospects, sent, segments });
+  // Ids launching a new list on each day: every 30 days from the day each batch goes live.
+  const launchIds = new Map<number, number>();
+  for (const b of batches) {
+    for (let d = b.liveDay; d <= totalDays; d += sop.daysPerMonth) launchIds.set(d, (launchIds.get(d) ?? 0) + b.ids);
   }
+
+  const campaigns: Campaign[] = [];
+  const firstQueue: { c: Campaign; left: number }[] = [];
+  // Follow ups waiting to go out, oldest due date first. step 1 is the first follow up.
+  let followQueue: { c: Campaign; step: number; due: number; amount: number }[] = [];
+  const lastStep = sop.emailsPerProspect - 1;
+  const outstanding = new Map<Campaign, number>();
+  const EPS = 1e-9;
+  let maxDelay = 0;
+
+  const monthTotals = Array.from({ length: months }, () => ({ prospects: 0, sent: 0 }));
+
+  const schedule = (c: Campaign, step: number, due: number, amount: number) => {
+    const same = followQueue.find((f) => f.c === c && f.step === step && f.due === due);
+    if (same) same.amount += amount;
+    else followQueue.push({ c, step, due, amount });
+    outstanding.set(c, (outstanding.get(c) ?? 0) + amount);
+  };
+
+  for (let day = 1; day <= totalDays; day++) {
+    const monthIdx = Math.floor((day - 1) / sop.daysPerMonth);
+    const liveIds = batches.reduce((t, b) => t + (day >= b.liveDay ? b.ids : 0), 0);
+    let capacity = liveIds * sop.emailsPerIdPerDay;
+
+    const launching = launchIds.get(day);
+    if (launching) {
+      const c: Campaign = {
+        launchDay: day,
+        ids: liveIds,
+        listSize: launching * listPerId,
+        firstEmailsPerDay: liveIds * sop.emailsPerIdPerDay,
+        firstEmailsFrom: day,
+        firstEmailsTo: day,
+        followUpsFrom: null,
+        followUpsTo: null,
+        complete: false,
+      };
+      campaigns.push(c);
+      firstQueue.push({ c, left: c.listSize });
+    }
+
+    // New prospects first.
+    for (const q of firstQueue) {
+      if (capacity <= EPS || q.left <= EPS) continue;
+      const send = Math.min(q.left, capacity);
+      q.left -= send;
+      capacity -= send;
+      q.c.firstEmailsTo = day;
+      monthTotals[monthIdx].prospects += send;
+      monthTotals[monthIdx].sent += send;
+      if (lastStep > 0) schedule(q.c, 1, day + sop.followUpGapDays, send);
+      else q.c.complete = q.left <= EPS;
+    }
+
+    // Then follow ups that are due, oldest first. Anything left over waits for the next day.
+    followQueue.sort((a, b) => a.due - b.due || a.step - b.step);
+    for (const f of followQueue) {
+      if (f.due > day || capacity <= EPS) continue;
+      const send = Math.min(f.amount, capacity);
+      f.amount -= send;
+      capacity -= send;
+      maxDelay = Math.max(maxDelay, day - f.due);
+      monthTotals[monthIdx].sent += send;
+      f.c.followUpsFrom ??= day;
+      f.c.followUpsTo = day;
+      outstanding.set(f.c, (outstanding.get(f.c) ?? 0) - send);
+      if (f.step < lastStep) schedule(f.c, f.step + 1, day + sop.followUpGapDays, send);
+    }
+    followQueue = followQueue.filter((f) => f.amount > EPS);
+    for (const q of firstQueue) if (q.left <= EPS && (outstanding.get(q.c) ?? 0) <= EPS) q.c.complete = true;
+  }
+
+  const plan: SendMonth[] = monthTotals.map((t, i) => {
+    const m = i + 1;
+    const monthEnd = m * sop.daysPerMonth;
+    return {
+      month: m,
+      idsAdded: batches.filter((b) => b.addedMonth === m).reduce((x, b) => x + b.ids, 0),
+      warmupUntilDay: batches.some((b) => b.addedMonth === m) ? sop.warmupDays : 0,
+      idsSendingAtEnd: batches.reduce((x, b) => x + (monthEnd >= b.liveDay ? b.ids : 0), 0),
+      prospects: t.prospects,
+      sent: t.sent,
+    };
+  });
 
   return {
     ...infra,
     months: plan,
+    campaigns,
+    maxFollowUpDelayDays: maxDelay,
     totalProspects: plan.reduce((t, m) => t + m.prospects, 0),
     totalSent: plan.reduce((t, m) => t + m.sent, 0),
   };

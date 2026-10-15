@@ -365,7 +365,8 @@ export const MODEL = {
  * - Exactly one month later: add the other 2 ids, warm up 14 days. From day 15 of month 2 all 4 ids send.
  * - Each id sends at most 25 emails a day. Ids send every day, and a month is counted as 30 days.
  * - Each prospect gets a first email plus 3 follow ups, 5 days apart.
- * - Each id is given about 150 new prospects a month, so follow ups always go out on time.
+ * - When ids go live they get a list of about 150 prospects each. Everyone on the list gets the first
+ *   email first (up to 25 a day per id), then the follow ups. Each id gets a new list every 30 days.
  */
 export const SENDING_SOP = {
   emailsPerIdPerDay: 25,

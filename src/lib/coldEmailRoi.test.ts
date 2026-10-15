@@ -51,50 +51,63 @@ describe("sending plan", () => {
     expect(plan.months[2]).toMatchObject({ idsAdded: 0, warmupUntilDay: 0, idsSendingAtEnd: 52 });
   });
 
-  it("month 1: warm-up to day 14, then 26 ids start 130 prospects a day", () => {
-    expect(plan.months[0].segments).toEqual([
-      { fromDay: 1, toDay: 14, idsSending: 0, newProspectsPerDay: 0 },
-      { fromDay: 15, toDay: 30, idsSending: 26, newProspectsPerDay: 130 },
-    ]);
-    expect(plan.months[0].prospects).toBe(16 * 130);
-    // First emails, plus follow ups due on days 20+, 25+ and 30.
-    expect(plan.months[0].sent).toBe(2080 + 11 * 130 + 6 * 130 + 1 * 130);
+  it("month 1: 26 ids go live on day 15 and get a list of 3,750", () => {
+    const c = plan.campaigns[0];
+    expect(c).toMatchObject({ launchDay: 15, ids: 26, listSize: 3750, firstEmailsPerDay: 650 });
+    // 3,750 first emails at 650 a day: days 15 to 20.
+    expect(c.firstEmailsFrom).toBe(15);
+    expect(c.firstEmailsTo).toBe(20);
+    expect(plan.months[0].prospects).toBe(3750);
   });
 
-  it("month 2: 26 ids to day 14, all 52 from day 15 at the 250 a day target", () => {
-    expect(plan.months[1].prospects).toBe(14 * 130 + 16 * 250);
-    expect(plan.months[1].sent).toBe(5820 + 5220 + 4620 + 4020);
+  it("sends every first email on a list before any of its follow ups", () => {
+    plan.campaigns.forEach((c) => {
+      if (c.followUpsFrom !== null) expect(c.followUpsFrom).toBeGreaterThanOrEqual(c.firstEmailsTo);
+    });
   });
 
-  it("month 3 onward runs at the full target", () => {
+  it("month 2: month 1's follow ups finish, then all 52 ids get a list of 7,500 on day 15", () => {
+    expect(plan.campaigns[0].complete).toBe(true);
+    expect(plan.campaigns[0].followUpsTo).toBeLessThan(45);
+    expect(plan.campaigns[1]).toMatchObject({ launchDay: 45, ids: 52, listSize: 7500, firstEmailsFrom: 45, firstEmailsTo: 50 });
+    expect(plan.months[1].prospects).toBe(7500);
+  });
+
+  it("month 3 onwards runs at the full target", () => {
     expect(plan.months[2]).toMatchObject({ prospects: 7500, sent: 30000 });
     expect(plan.months[3]).toMatchObject({ prospects: 7500, sent: 30000 });
   });
 
-  it("never sends more than 25 emails per live id per day", () => {
-    const busy = calculateSendingPlan(7500, 12);
-    busy.months.forEach((m) => m.segments.forEach((s) => expect(s.newProspectsPerDay * 4).toBeLessThanOrEqual(s.idsSending * 25)));
+  it("every list gets all 4 emails, and follow ups slip by at most a day", () => {
+    const long = calculateSendingPlan(7500, 13);
+    // All but the last list finish inside 13 months.
+    long.campaigns.slice(0, -1).forEach((c) => expect(c.complete).toBe(true));
+    const firstEmails = long.months.reduce((t, m) => t + m.prospects, 0);
+    const finished = long.campaigns.slice(0, -1).reduce((t, c) => t + c.listSize, 0);
+    expect(long.totalSent).toBeGreaterThanOrEqual(finished * 4);
+    expect(firstEmails).toBe(3750 + 12 * 7500);
+    expect(long.maxFollowUpDelayDays).toBeLessThanOrEqual(1);
   });
 });
 
 describe("calculateRoi", () => {
   it("runs the funnel on prospects reached", () => {
     const r = calculateRoi(base);
-    expect(r.prospects).toBe(2080 + 5820 + 10 * 7500);
-    expect(r.sent).toBe(4420 + 19680 + 10 * 30000);
-    expect(r.delivered).toBeCloseTo(82900 * 0.985, 6);
-    expect(Math.round(r.replies)).toBe(2776);
-    expect(Math.round(r.positive)).toBe(1111);
-    expect(Math.round(r.booked)).toBe(444);
-    expect(Math.round(r.held)).toBe(333);
-    expect(r.deals).toBeCloseTo(39.98, 2);
+    expect(r.prospects).toBe(3750 + 11 * 7500);
+    expect(r.sent).toBe(r.plan.months.reduce((t, m) => t + m.sent, 0));
+    expect(r.delivered).toBeCloseTo(86250 * 0.985, 6);
+    expect(Math.round(r.replies)).toBe(2889);
+    expect(Math.round(r.positive)).toBe(1155);
+    expect(Math.round(r.booked)).toBe(462);
+    expect(Math.round(r.held)).toBe(347);
+    expect(r.deals).toBeCloseTo(41.59, 2);
     expect(r.cost).toBe(30000);
   });
 
   it("pays revenue month by month, so customers won late add less", () => {
     const r = calculateRoi(base);
     const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
-    const prospectsByMonth = [2080, 5820, ...Array(10).fill(7500)];
+    const prospectsByMonth = [3750, ...Array(11).fill(7500)];
     // $1,000 x 12 invoices / 12 = $1,000 a month per customer, paid from the month won to month 12.
     const expected = prospectsByMonth.reduce((t, p, i) => t + p * perProspect * 1000 * (12 - i), 0);
     expect(r.revenue).toBeCloseTo(expected, 6);
@@ -107,7 +120,7 @@ describe("calculateRoi", () => {
     const r = calculateRoi({ ...base, retentionMonths: 3, durationMonths: 3 });
     const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
     // Month 1 customers pay 3 months, month 2 customers 2, month 3 customers 1.
-    expect(r.revenue).toBeCloseTo(perProspect * 1000 * (2080 * 3 + 5820 * 2 + 7500 * 1), 6);
+    expect(r.revenue).toBeCloseTo(perProspect * 1000 * (3750 * 3 + 7500 * 2 + 7500 * 1), 6);
   });
 
   it("does not pay back in month 1 when nothing sends until day 15", () => {
@@ -117,9 +130,9 @@ describe("calculateRoi", () => {
 
   it("builds meetings month by month from ramped prospects, not full speed", () => {
     const r = calculateRoi({ ...base, durationMonths: 3 });
-    expect(r.prospects).toBe(2080 + 5820 + 7500);
+    expect(r.prospects).toBe(3750 + 7500 + 7500);
     const perMonth = r.plan.months.map((m) => m.prospects * bookedPerProspect(base));
-    expect(perMonth[0]).toBeCloseTo(2080 * 0.985 * 0.034 * 0.4 * 0.4, 9);
+    expect(perMonth[0]).toBeCloseTo(3750 * 0.985 * 0.034 * 0.4 * 0.4, 9);
     expect(perMonth.reduce((a, b) => a + b, 0)).toBeCloseTo(r.booked, 9);
     // Full speed for all 3 months would have been 22,500 prospects.
     expect(r.booked).toBeLessThan(22500 * bookedPerProspect(base));
@@ -149,11 +162,11 @@ describe("calculateRoi", () => {
 
   it("drops deals that pay out after the duration ends", () => {
     const r = calculateRoi({ ...base, salesCycleLagMonths: 3 });
-    const countedShare = (2080 + 5820 + 7 * 7500) / r.prospects;
+    const countedShare = (3750 + 8 * 7500) / r.prospects;
     expect(r.dealsCounted).toBeCloseTo(r.deals * countedShare, 6);
     // Month 1 customers start paying in month 4, so they pay 9 months inside the 12.
     const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
-    const prospectsByMonth = [2080, 5820, ...Array(7).fill(7500)];
+    const prospectsByMonth = [3750, ...Array(8).fill(7500)];
     const expected = prospectsByMonth.reduce((t, p, i) => t + p * perProspect * 1000 * (12 - (i + 3)), 0);
     expect(r.revenue).toBeCloseTo(expected, 6);
   });

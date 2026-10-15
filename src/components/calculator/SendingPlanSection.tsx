@@ -31,8 +31,10 @@ export const SendingPlanSection = forwardRef<HTMLDivElement, { api: CalculatorAp
                   `Each domain starts with ${sop.firstBatchIds} ids on day 1`,
                   `New ids warm up for ${sop.warmupDays} days, then send`,
                   `One month later the other ${sop.idsPerDomain - sop.firstBatchIds} ids are added`,
-                  `Each id: up to ${sop.prospectsPerIdPerMonth} new prospects a month, max ${sop.emailsPerIdPerDay} emails a day`,
-                  `Each prospect: first email and ${sop.emailsPerProspect - 1} follow ups, ${sop.followUpGapDays} days apart`,
+                  `When ids go live they get a list of about ${sop.prospectsPerIdPerMonth} prospects each`,
+                  `Everyone on the list gets the first email first, up to ${sop.emailsPerIdPerDay} a day per id`,
+                  `Then ${sop.emailsPerProspect - 1} follow ups, ${sop.followUpGapDays} days apart`,
+                  `Each id gets a new list every ${sop.daysPerMonth} days`,
                   `Ids send every day. A month is ${sop.daysPerMonth} days`,
                 ]}
               />

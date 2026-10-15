@@ -44,9 +44,12 @@ export function useColdEmailCalculator() {
     [state, monthlyProspects],
   );
 
-  /** Ramp for the sending card. Always covers 3 months so the climb to full speed is visible. */
+  /**
+   * Ramp for the sending cards. Covers at least 3 months so the climb to full speed is visible,
+   * plus one month so the last card's follow ups are shown finishing rather than cut off.
+   */
   const rampPlan = useMemo(
-    () => calculateSendingPlan(monthlyProspects, Math.max(state.durationMonths, 3)),
+    () => calculateSendingPlan(monthlyProspects, Math.max(state.durationMonths, 3) + 1),
     [monthlyProspects, state.durationMonths],
   );
 

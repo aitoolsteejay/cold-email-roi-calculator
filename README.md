@@ -27,11 +27,11 @@ npm run build
 The visitor fills in one volume box: emails per day or new prospects per month, both at full speed. The other is worked out (1,000 emails a day = 7,500 prospects a month, at 4 emails per prospect over a 30 day month). `calculateSendingPlan` in `src/lib/coldEmailRoi.ts` then works day by day, using the rules in `SENDING_SOP`:
 
 - Each prospect gets a first email and 3 follow ups, 5 days apart.
-- Each id gets up to 150 new prospects a month (5 a day). At 4 emails each that is about 20 emails a day, under the 25 cap, so follow ups go out on time.
 - Ids needed = prospects per month / 150, rounded up to whole domains of 4 ids. All domains are bought on day 1.
-- Day 1: 2 ids per domain go into Smartlead and warm up for 14 days. They send from day 15.
-- Exactly one month later the other 2 ids are added and warmed for 14 days. All 4 send from day 15 of month 2.
-- Ids send every day, and a month is 30 days.
+- Day 1: 2 ids per domain go into Smartlead and warm up for 14 days. They go live on day 15.
+- Exactly one month later the other 2 ids are added and warmed for 14 days. They go live on day 15 of month 2.
+- When ids go live they get a campaign list: the monthly target split evenly across all ids (about 150 each). Everyone on the list gets the first email before any follow up goes out, at up to 25 emails per id a day. Follow ups then go out 5 days after the previous email, only slipping if a day's capacity is used up.
+- Each id gets a new list every 30 days from the day it went live. Ids send every day, and a month is 30 days.
 
 The funnel runs on prospects: bounce and reply rates are per prospect, across the whole sequence.
 
@@ -52,7 +52,7 @@ The sliders start at Myntmore's own 2026 Smartlead averages (pulled 15 October 2
 
 To refresh them, update those numbers in `src/data/coldEmailBenchmarks.ts`.
 
-For 7,500 prospects a month that is 13 domains and 52 ids. Month 1 reaches 2,080 prospects with 4,420 emails, month 2 reaches 5,820 with 19,680, and month 3 onward reaches 7,500 with 30,000 a month.
+For 7,500 prospects a month that is 13 domains and 52 ids. Month 1: a list of 3,750 on 26 ids on day 15 (10,400 emails that month). Month 2: month 1's follow ups finish by day 8, then a list of 7,500 on all 52 ids on day 15 (25,400 emails). Month 3 onwards: a list of 7,500 every month on day 15 (30,000 emails a month).
 
 ## Moving it into the Next.js site
 
