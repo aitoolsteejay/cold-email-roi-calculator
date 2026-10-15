@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { HandUnderline, PillBadge } from "@/components/site/HandUnderline";
 import { BENCHMARKS, DURATION_OPTIONS, FOOTNOTE, INDUSTRIES, RATE_ORDER } from "@/data/coldEmailBenchmarks";
+import { bookedPerProspect } from "@/lib/coldEmailRoi";
 import { exportResultsPdf } from "@/lib/exportPdf";
 import { formatInteger, formatPercent, getCurrency } from "@/lib/format";
 import { ConversionFunnel } from "./ConversionFunnel";
@@ -82,7 +83,13 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
             <StatRow result={result} currency={currency} hasInvestment={hasInvestment} />
             <ConversionFunnel result={result} currency={currency} />
             <GrowthChart result={result} currency={currency} hasInvestment={hasInvestment} />
-            <SendingRampCard rampPlan={rampPlan} durationPlan={result.plan} durationMonths={state.durationMonths} locale={currency.locale} />
+            <SendingRampCard
+              rampPlan={rampPlan}
+              durationPlan={result.plan}
+              durationMonths={state.durationMonths}
+              bookedPerProspect={bookedPerProspect(state)}
+              locale={currency.locale}
+            />
           </div>
           <IndustryBenchmarks selected={state.industry} />
           <p className="text-xs leading-relaxed text-muted-foreground">{FOOTNOTE}</p>

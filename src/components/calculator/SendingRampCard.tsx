@@ -1,12 +1,16 @@
+import { Fragment } from "react";
 import { ArrowRight, Mail } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SENDING_SOP } from "@/data/coldEmailBenchmarks";
 import type { SendMonth, SendSegment, SendingPlan } from "@/lib/coldEmailRoi";
 import { formatCount, formatInteger } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { InfoTip } from "./InfoTip";
 
 interface Row {
   label: string;
+  /** Shorter label for phones, e.g. "Month 3+". */
+  shortLabel: string;
   month: SendMonth;
   ongoing: boolean;
 }
@@ -19,10 +23,10 @@ function rowsFor(plan: SendingPlan): Row[] {
   for (const m of plan.months) {
     const full = plan.prospectsPerMonth > 0 && close(m.prospects, plan.prospectsPerMonth) && close(m.sent, plan.prospectsPerMonth * SENDING_SOP.emailsPerProspect);
     if (full) {
-      rows.push({ label: `Month ${m.month} onward`, month: m, ongoing: true });
+      rows.push({ label: `Month ${m.month} onward`, shortLabel: `Month ${m.month}+`, month: m, ongoing: true });
       break;
     }
-    rows.push({ label: `Month ${m.month}`, month: m, ongoing: false });
+    rows.push({ label: `Month ${m.month}`, shortLabel: `Month ${m.month}`, month: m, ongoing: false });
   }
   return rows;
 }
@@ -50,10 +54,12 @@ interface Props {
   /** Plan for the chosen duration, used for the total line. */
   durationPlan: SendingPlan;
   durationMonths: number;
+  /** Meetings booked per prospect reached, from the funnel rates. */
+  bookedPerProspect: number;
   locale: string;
 }
 
-export function SendingRampCard({ rampPlan, durationPlan, durationMonths, locale }: Props) {
+export function SendingRampCard({ rampPlan, durationPlan, durationMonths, bookedPerProspect, locale }: Props) {
   if (rampPlan.domains === 0) return null;
   const rows = rowsFor(rampPlan);
   const sop = SENDING_SOP;
@@ -82,38 +88,51 @@ export function SendingRampCard({ rampPlan, durationPlan, durationMonths, locale
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-[13px] sm:text-sm">
           <thead>
-            <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
-              <th scope="col" className="py-2 pr-3 font-medium">Month</th>
-              <th scope="col" className="hidden py-2 pr-3 font-medium md:table-cell">Who is sending</th>
-              <th scope="col" className="py-2 pr-3 text-right font-medium">New prospects</th>
-              <th scope="col" className="py-2 text-right font-medium">Emails sent</th>
+            <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground sm:text-xs">
+              <th scope="col" className="py-2 pr-2 sm:pr-3 font-medium">Month</th>
+              <th scope="col" className="hidden py-2 pr-2 sm:pr-3 font-medium md:table-cell">Who is sending</th>
+              <th scope="col" className="py-2 pr-2 sm:pr-3 text-right font-medium">New prospects</th>
+              <th scope="col" className="py-2 pr-2 sm:pr-3 text-right font-medium">Emails sent</th>
+              <th scope="col" className="py-2 text-right font-medium">Meetings booked</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.label} className="border-b border-border/60 align-top last:border-0">
-                <th scope="row" className="py-2.5 pr-3 font-semibold md:whitespace-nowrap">
-                  {r.label}
-                  {/* On smaller screens the details sit under the month instead of in their own column. */}
-                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground md:hidden">
-                    <Details month={r.month} locale={locale} />
-                  </span>
+            {rows.map((r, i) => {
+              const last = i === rows.length - 1;
+              return (
+              <Fragment key={r.label}>
+              <tr className={cn("align-top", !last && "md:border-b md:border-border/60")}>
+                <th scope="row" className="whitespace-nowrap py-2.5 pr-2 sm:pr-3 font-semibold">
+                  <span className="md:hidden">{r.shortLabel}</span>
+                  <span className="hidden md:inline">{r.label}</span>
                 </th>
-                <td className="hidden py-2.5 pr-3 text-muted-foreground md:table-cell">
+                <td className="hidden py-2.5 pr-2 sm:pr-3 text-muted-foreground md:table-cell">
                   <Details month={r.month} locale={locale} />
                 </td>
-                <td className="whitespace-nowrap py-2.5 pr-3 text-right font-bold text-foreground">
+                <td className="whitespace-nowrap py-2.5 pr-2 sm:pr-3 text-right font-bold text-foreground">
                   {formatInteger(r.month.prospects, locale)}
-                  {r.ongoing && <span className="block text-xs font-normal text-muted-foreground">per month</span>}
+                  {r.ongoing && <span className="block text-[11px] font-normal text-muted-foreground sm:text-xs">per month</span>}
                 </td>
-                <td className="whitespace-nowrap py-2.5 text-right font-bold text-foreground">
+                <td className="whitespace-nowrap py-2.5 pr-2 sm:pr-3 text-right font-bold text-foreground">
                   {formatInteger(r.month.sent, locale)}
-                  {r.ongoing && <span className="block text-xs font-normal text-muted-foreground">per month</span>}
+                  {r.ongoing && <span className="block text-[11px] font-normal text-muted-foreground sm:text-xs">per month</span>}
+                </td>
+                <td className="whitespace-nowrap py-2.5 text-right font-bold text-accent">
+                  {formatCount(r.month.prospects * bookedPerProspect, locale)}
+                  {r.ongoing && <span className="block text-[11px] font-normal text-muted-foreground sm:text-xs">per month</span>}
                 </td>
               </tr>
-            ))}
+              {/* On smaller screens the details get their own full-width line under the numbers. */}
+              <tr className={cn("md:hidden", !last && "border-b border-border/60")}>
+                <td colSpan={4} className="pb-2.5 text-xs text-muted-foreground">
+                  <Details month={r.month} locale={locale} />
+                </td>
+              </tr>
+              </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -121,7 +140,8 @@ export function SendingRampCard({ rampPlan, durationPlan, durationMonths, locale
       <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-foreground">
           Over {durationMonths} {durationMonths === 1 ? "month" : "months"}: <strong>{formatInteger(durationPlan.totalProspects, locale)} prospects</strong>
-          , <strong>{formatInteger(durationPlan.totalSent, locale)} emails</strong>
+          , <strong>{formatInteger(durationPlan.totalSent, locale)} emails</strong>,{" "}
+          <strong>{formatCount(durationPlan.totalProspects * bookedPerProspect, locale)} meetings booked</strong>
         </p>
         <a
           href="/founder-meeting"

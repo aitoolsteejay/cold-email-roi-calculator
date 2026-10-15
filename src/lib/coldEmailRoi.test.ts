@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bookedPerProspect,
   calculateInfrastructure,
   calculateRoi,
   calculateSendingPlan,
@@ -83,6 +84,16 @@ describe("calculateRoi", () => {
     expect(r.deals).toBeCloseTo(39.98, 2);
     expect(r.revenue).toBeCloseTo(r.deals * 12000, 6);
     expect(r.cost).toBe(30000);
+  });
+
+  it("builds meetings month by month from ramped prospects, not full speed", () => {
+    const r = calculateRoi({ ...base, durationMonths: 3 });
+    expect(r.prospects).toBe(2080 + 5820 + 7500);
+    const perMonth = r.plan.months.map((m) => m.prospects * bookedPerProspect(base));
+    expect(perMonth[0]).toBeCloseTo(2080 * 0.985 * 0.034 * 0.4 * 0.4, 9);
+    expect(perMonth.reduce((a, b) => a + b, 0)).toBeCloseTo(r.booked, 9);
+    // Full speed for all 3 months would have been 22,500 prospects.
+    expect(r.booked).toBeLessThan(22500 * bookedPerProspect(base));
   });
 
   it("returns null ROI and no NaN when cost is zero", () => {

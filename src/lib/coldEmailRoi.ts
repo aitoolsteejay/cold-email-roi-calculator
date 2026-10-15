@@ -136,6 +136,11 @@ export function calculateLtv(i: Pick<RoiInputs, "dealValue" | "invoicesPerYear" 
 }
 
 /** Meetings booked per 1,000 prospects reached, from the rates alone. */
+/** Meetings booked for each prospect reached. Multiply by a month's prospects to get that month's meetings. */
+export function bookedPerProspect(i: Pick<RoiInputs, "bounceRate" | "replyRate" | "positiveShare" | "bookingRate">): number {
+  return meetingsPer1000Prospects(i) / 1000;
+}
+
 export function meetingsPer1000Prospects(i: Pick<RoiInputs, "bounceRate" | "replyRate" | "positiveShare" | "bookingRate">): number {
   const p = (v: number) => safeRate(v) / 100;
   return 1000 * (1 - p(i.bounceRate)) * p(i.replyRate) * p(i.positiveShare) * p(i.bookingRate);
