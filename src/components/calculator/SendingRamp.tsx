@@ -1,120 +1,39 @@
-import { forwardRef, useState } from "react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { forwardRef } from "react";
 import { SENDING_SOP } from "@/data/coldEmailBenchmarks";
-import type { IdSegment, SendMonth, SendingPlan } from "@/lib/coldEmailRoi";
+import type { SendMonth, SendingPlan } from "@/lib/coldEmailRoi";
 import { formatInteger } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Lines } from "./Lines";
 
-interface MonthCard {
+interface Column {
   title: string;
   month: SendMonth;
-  /** True for the card that stands for every month once all ids are live. */
+  /** True for the column that stands for every month once all ids are live. */
   ongoing: boolean;
 }
 
 /** Month 1, Month 2, ... then "Month N onwards" from the first month every id sends all month. */
-function cardsFor(plan: SendingPlan): MonthCard[] {
-  const cards: MonthCard[] = [];
+function columnsFor(plan: SendingPlan): Column[] {
+  const cols: Column[] = [];
   for (const m of plan.months) {
     const allMonth = m.idSegments.length === 1 && m.idSegments[0].idsSending === plan.ids;
     if (allMonth) {
-      cards.push({ title: `Month ${m.month} onwards`, month: m, ongoing: true });
+      cols.push({ title: `Month ${m.month} onwards`, month: m, ongoing: true });
       break;
     }
-    cards.push({ title: `Month ${m.month}`, month: m, ongoing: false });
+    cols.push({ title: `Month ${m.month}`, month: m, ongoing: false });
   }
-  return cards;
+  return cols;
 }
 
-type Kind = "warmup" | "some" | "all";
-
-const KINDS: Record<Kind, { label: string; className: string }> = {
-  warmup: { label: "Warm-up", className: "bg-muted-foreground/25" },
-  some: { label: "Half the ids sending", className: "bg-primary/50" },
-  all: { label: "All ids sending", className: "bg-primary" },
-};
-
-function kindOf(seg: IdSegment, totalIds: number): Kind {
-  if (seg.idsSending === 0) return "warmup";
-  return seg.idsSending >= totalIds ? "all" : "some";
-}
-
-/**
- * One coloured stretch of the bar. Its details open on mouse hover, keyboard focus or tap,
- * and close when the pointer leaves, focus moves on, or the visitor taps elsewhere.
- */
-function BarSegment({ seg, kind, lines }: { seg: IdSegment; kind: Kind; lines: string[] }) {
-  const [open, setOpen] = useState(false);
-  const days = SENDING_SOP.daysPerMonth;
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={lines.join(", ")}
-          onPointerEnter={(e) => e.pointerType === "mouse" && setOpen(true)}
-          onPointerLeave={(e) => e.pointerType === "mouse" && setOpen(false)}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onClick={(e) => {
-            // Always open on click or tap; tapping elsewhere closes it.
-            e.preventDefault();
-            setOpen(true);
-          }}
-          className={cn(
-            "absolute inset-y-0 cursor-help transition-[filter] hover:brightness-95 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            KINDS[kind].className,
-          )}
-          style={{ left: `${((seg.fromDay - 1) / days) * 100}%`, width: `${((seg.toDay - seg.fromDay + 1) / days) * 100}%` }}
-        />
-      </PopoverTrigger>
-      <PopoverContent
-        side="top"
-        align="center"
-        className="pointer-events-none w-auto px-3 py-2 text-xs"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
-        <Lines items={lines} />
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function Timeline({ month, plan, locale }: { month: SendMonth; plan: SendingPlan; locale: string }) {
-  const days = SENDING_SOP.daysPerMonth;
+/** "20 from day 15", "20, then 40 from day 15" or "40". */
+function idsSending(month: SendMonth, locale: string) {
   const n = (v: number) => formatInteger(v, locale);
-  const marks = [1, ...month.idSegments.slice(1).map((s) => s.fromDay), days];
-  return (
-    <div>
-      <div className="relative h-4 overflow-hidden rounded-full bg-secondary">
-        {month.idSegments.map((seg) => {
-          const kind = kindOf(seg, plan.ids);
-          const lines =
-            kind === "warmup"
-              ? [`Days ${seg.fromDay} to ${seg.toDay}`, "Ids warm up, nothing is sent"]
-              : [
-                  `Days ${seg.fromDay} to ${seg.toDay}`,
-                  `${n(seg.idsSending)} ids sending`,
-                  `${n(seg.idsSending * plan.emailsPerIdPerDay)} emails a day`,
-                ];
-          return <BarSegment key={seg.fromDay} seg={seg} kind={kind} lines={lines} />;
-        })}
-      </div>
-      <div className="relative mt-1 h-3 text-[10px] text-muted-foreground" aria-hidden="true">
-        {marks.map((d, i) => (
-          <span
-            key={d}
-            className={cn("absolute", i === 0 ? "left-0" : i === marks.length - 1 ? "right-0" : "-translate-x-1/2")}
-            style={i === 0 || i === marks.length - 1 ? undefined : { left: `${((d - 0.5) / days) * 100}%` }}
-          >
-            {i === 0 ? "Day 1" : d}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
+  const sending = month.idSegments.filter((s) => s.idsSending > 0);
+  if (sending.length === 0) return "None yet";
+  const first = sending[0];
+  if (sending.length === 1) return first.fromDay === 1 ? n(first.idsSending) : `${n(first.idsSending)} from day ${first.fromDay}`;
+  const last = sending[sending.length - 1];
+  return `${n(first.idsSending)}, then ${n(last.idsSending)} from day ${last.fromDay}`;
 }
 
 interface Props {
@@ -124,7 +43,7 @@ interface Props {
   locale: string;
 }
 
-/** The ramp month by month: a 30 day bar showing when ids warm up and send, plus the month's totals. */
+/** The ramp as a small table: ids sending, new prospects, follow ups and total emails for each month. */
 export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRamp({ rampPlan, durationPlan, durationMonths, locale }, ref) {
   const n = (v: number) => formatInteger(v, locale);
 
@@ -136,74 +55,109 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
     );
   }
 
-  const cards = cardsFor(rampPlan);
-  const liveDay = SENDING_SOP.warmupDays + 1;
+  const cols = columnsFor(rampPlan);
+  // Once every id is live, new prospects vary a little month to month as lists finish on different days,
+  // so that column shows the monthly average (the target). Emails are the same every month.
+  const figures = cols.map(({ month, ongoing }) => {
+    const prospects = ongoing ? rampPlan.prospectsPerMonth : month.prospects;
+    const emails = ongoing ? rampPlan.emailsPerDay * SENDING_SOP.daysPerMonth : month.sent;
+    return { prospects, followUps: emails - prospects, emails, approx: ongoing ? "~" : "" };
+  });
+
+  const rows: { label: string; values: string[]; strong?: boolean }[] = [
+    { label: "Ids sending", values: cols.map((c) => idsSending(c.month, locale)) },
+    { label: "New prospects reached", values: figures.map((f) => `${f.approx}${n(f.prospects)}`) },
+    { label: "Follow-ups sent", values: figures.map((f) => `${f.approx}${n(f.followUps)}`) },
+    { label: "Total emails sent", values: figures.map((f) => n(f.emails)), strong: true },
+  ];
+
+  const totals = [
+    { label: "New prospects reached", value: durationPlan.totalProspects },
+    { label: "Follow-ups sent", value: durationPlan.totalSent - durationPlan.totalProspects },
+    { label: "Total emails sent", value: durationPlan.totalSent },
+  ];
 
   return (
     <div ref={ref} className="space-y-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {(Object.keys(KINDS) as Kind[]).map((k) => (
-          <span key={k} className="inline-flex items-center gap-1.5">
-            <span className={cn("h-2.5 w-2.5 rounded-full", KINDS[k].className)} aria-hidden="true" />
-            {KINDS[k].label}
-          </span>
-        ))}
+      <p className="text-sm text-muted-foreground">
+        <strong className="text-foreground">{n(rampPlan.domains)} domains</strong> · <strong className="text-foreground">{n(rampPlan.ids)} ids</strong> ({SENDING_SOP.idsPerDomain}{" "}
+        per domain). New ids warm up for {SENDING_SOP.warmupDays} days before sending.
+      </p>
+
+      <div className="hidden overflow-x-auto rounded-xl border border-border sm:block">
+        <table className="w-full text-left text-[13px] sm:text-sm">
+          <thead>
+            <tr className="border-b border-border bg-secondary/40">
+              <th scope="col" className="px-3 py-2.5">
+                <span className="sr-only">Measure</span>
+              </th>
+              {cols.map((c) => (
+                <th
+                  key={c.title}
+                  scope="col"
+                  className={cn("px-3 py-2.5 text-right font-black text-foreground", c.ongoing && "bg-[#16a34a]/10")}
+                >
+                  {c.title}
+                  {c.ongoing && <span className="block text-[11px] font-normal text-muted-foreground">per month</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label} className={cn("border-b border-border/60 last:border-0", r.strong && "bg-secondary/20")}>
+                <th scope="row" className={cn("px-3 py-2.5 font-medium text-muted-foreground", r.strong && "font-semibold text-foreground")}>
+                  {r.label}
+                </th>
+                {r.values.map((v, i) => (
+                  <td
+                    key={cols[i].title}
+                    className={cn(
+                      "px-3 py-2.5 text-right tabular-nums text-foreground",
+                      r.strong ? "font-black" : "font-semibold",
+                      cols[i].ongoing && "bg-[#16a34a]/5",
+                    )}
+                  >
+                    {v}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {cards.map(({ title, month, ongoing }) => {
-          const idsLine =
-            month.month === 1
-              ? `${n(month.idsAdded)} ids, live from day ${liveDay}`
-              : month.idsAdded > 0
-                ? `+${n(month.idsAdded)} ids, live from day ${liveDay}`
-                : `All ${n(rampPlan.ids)} ids, every day`;
-          // From the point every id is live, new prospects vary a little month to month as lists finish
-          // on different days, so the card shows the monthly average (the target).
-          const prospects = ongoing ? rampPlan.prospectsPerMonth : month.prospects;
-          const sent = ongoing ? rampPlan.emailsPerDay * SENDING_SOP.daysPerMonth : month.sent;
-          return (
-            <div key={title} className={cn("flex flex-col rounded-xl border p-4", ongoing ? "border-[#16a34a]/30 bg-[#16a34a]/5" : "border-border bg-secondary/20")}>
-              <div className="mb-3">
-                <h4 className="text-base font-black text-foreground">{title}</h4>
-                <p className="text-xs text-muted-foreground">
-                  {n(rampPlan.domains)} domains · {idsLine}
-                </p>
-              </div>
-
-              <Timeline month={month} plan={rampPlan} locale={locale} />
-
-              <dl className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
-                <div className="flex items-baseline justify-between gap-2">
-                  <dt className="text-muted-foreground">New prospects{ongoing ? " a month" : ""}</dt>
-                  <dd className="font-bold text-foreground">
-                    {ongoing ? "~" : ""}
-                    {n(prospects)}
-                  </dd>
+      {/* Phones: the same rows, one month at a time, so nothing scrolls sideways. */}
+      <div className="space-y-2 sm:hidden">
+        {cols.map((c, i) => (
+          <div key={c.title} className={cn("rounded-xl border p-3", c.ongoing ? "border-[#16a34a]/30 bg-[#16a34a]/5" : "border-border bg-secondary/20")}>
+            <p className="mb-1.5 text-sm font-black text-foreground">
+              {c.title}
+              {c.ongoing && <span className="font-normal text-muted-foreground"> (per month)</span>}
+            </p>
+            <dl className="space-y-1 text-[13px]">
+              {rows.map((r) => (
+                <div key={r.label} className="flex items-baseline justify-between gap-3">
+                  <dt className={cn("text-muted-foreground", r.strong && "font-semibold text-foreground")}>{r.label}</dt>
+                  <dd className={cn("text-right tabular-nums text-foreground", r.strong ? "font-black" : "font-semibold")}>{r.values[i]}</dd>
                 </div>
-                <div className="flex items-baseline justify-between gap-2">
-                  <dt className="text-muted-foreground">Emails sent{ongoing ? " a month" : ""}</dt>
-                  <dd className="font-bold text-foreground">{n(sent)}</dd>
-                </div>
-              </dl>
-            </div>
-          );
-        })}
+              ))}
+            </dl>
+          </div>
+        ))}
       </div>
 
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Over {durationMonths} {durationMonths === 1 ? "month" : "months"}
         </p>
-        <dl className="grid grid-cols-2 gap-2 text-center">
-          <div className="flex flex-col-reverse">
-            <dt className="text-xs text-muted-foreground">prospects</dt>
-            <dd className="text-lg font-black text-foreground sm:text-xl">{n(durationPlan.totalProspects)}</dd>
-          </div>
-          <div className="flex flex-col-reverse">
-            <dt className="text-xs text-muted-foreground">emails</dt>
-            <dd className="text-lg font-black text-foreground sm:text-xl">{n(durationPlan.totalSent)}</dd>
-          </div>
+        <dl className="grid grid-cols-3 gap-2 text-center">
+          {totals.map((t, i) => (
+            <div key={t.label} className="flex flex-col-reverse">
+              <dt className="text-xs text-muted-foreground">{t.label}</dt>
+              <dd className={cn("text-lg text-foreground sm:text-xl", i === totals.length - 1 ? "font-black" : "font-bold")}>{n(t.value)}</dd>
+            </div>
+          ))}
         </dl>
       </div>
     </div>
