@@ -11,13 +11,13 @@ import { GrowthChart } from "./GrowthChart";
 import { HighlightCards } from "./HighlightCards";
 import { IndustryBenchmarks } from "./IndustryBenchmarks";
 import { InputsPanel } from "./InputsPanel";
-import { SendingCapacityCard } from "./SendingCapacityCard";
+import { SendingRampCard } from "./SendingRampCard";
 import { StatRow } from "./StatRow";
 import { useColdEmailCalculator } from "./useColdEmailCalculator";
 
 export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: string }) {
   const api = useColdEmailCalculator();
-  const { state, result, capacity } = api;
+  const { state, result, rampPlan } = api;
   const currency = getCurrency(state.currency);
   const hasDealValue = (state.dealValue ?? 0) > 0;
   const hasInvestment = (state.monthlyInvestment ?? 0) > 0;
@@ -35,13 +35,14 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
         subtitle: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
         assumptions: [
           ...(industry ? [`Industry: ${industry}`] : []),
-          `Monthly emails sent: ${formatInteger(state.monthlyEmails, currency.locale)}`,
+          `Emails per day at full speed: ${formatInteger(state.dailyEmailTarget, currency.locale)}`,
+          `Domains: ${formatInteger(result.plan.domains, currency.locale)}  |  Ids: ${formatInteger(result.plan.ids, currency.locale)}`,
           `Duration: ${DURATION_OPTIONS.find((d) => d.months === state.durationMonths)?.label ?? `${state.durationMonths} months`}`,
           ...RATE_ORDER.map((k) => `${BENCHMARKS[k].label}: ${formatPercent(state[k])}`),
           `Average deal value: ${money(state.dealValue)}`,
           `Invoices per year: ${state.invoicesPerYear}  |  Retention: ${state.retentionMonths} months`,
           `Monthly investment: ${money(state.monthlyInvestment)}`,
-          `Warm-up: ${state.warmup ? "on" : "off"}  |  Sales cycle lag: ${state.salesCycleLagMonths} months`,
+          `Sales cycle lag: ${state.salesCycleLagMonths} months`,
         ],
         footnote: FOOTNOTE,
         fileName: "myntmore-cold-email-roi.pdf",
@@ -79,11 +80,11 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
           <div ref={resultsRef} className="space-y-6" aria-live="off">
             <HighlightCards result={result} currency={currency} hasDealValue={hasDealValue} hasInvestment={hasInvestment} durationMonths={state.durationMonths} />
             <StatRow result={result} currency={currency} hasInvestment={hasInvestment} />
+            <SendingRampCard rampPlan={rampPlan} durationPlan={result.plan} durationMonths={state.durationMonths} locale={currency.locale} />
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               <ConversionFunnel result={result} currency={currency} />
               <GrowthChart result={result} currency={currency} hasInvestment={hasInvestment} />
             </div>
-            <SendingCapacityCard monthlyEmails={state.monthlyEmails} mailboxes={capacity.mailboxes} domains={capacity.domains} locale={currency.locale} />
           </div>
           <IndustryBenchmarks selected={state.industry} />
           <p className="text-xs leading-relaxed text-muted-foreground">{FOOTNOTE}</p>

@@ -291,7 +291,8 @@ export const DURATION_OPTIONS: { months: number; label: string }[] = [
 export interface CalculatorState {
   currency: string;
   industry: string | null;
-  monthlyEmails: number;
+  /** Emails per day the visitor wants once every domain runs at full capacity. */
+  dailyEmailTarget: number;
   durationMonths: number;
   bounceRate: number;
   replyRate: number;
@@ -304,14 +305,13 @@ export interface CalculatorState {
   invoicesPerYear: number;
   retentionMonths: number;
   monthlyInvestment: number | null;
-  warmup: boolean;
   salesCycleLagMonths: number;
 }
 
 export const DEFAULT_STATE: CalculatorState = {
   currency: "USD",
   industry: null,
-  monthlyEmails: 5000,
+  dailyEmailTarget: 1000,
   durationMonths: 12,
   bounceRate: BENCHMARKS.bounceRate.defaultValue,
   replyRate: BENCHMARKS.replyRate.defaultValue,
@@ -323,7 +323,6 @@ export const DEFAULT_STATE: CalculatorState = {
   invoicesPerYear: 1,
   retentionMonths: 12,
   monthlyInvestment: null,
-  warmup: true,
   salesCycleLagMonths: 0,
 };
 
@@ -332,19 +331,26 @@ export const DEFAULT_STATE: CalculatorState = {
 /* ------------------------------------------------------------------ */
 
 export const MODEL = {
-  /** Share of normal volume sent in month one while new mailboxes warm up. */
-  warmupFirstMonthFactor: 0.5,
-  warmupWeeks: 2,
   /** Highest sales cycle lag the input accepts. */
   maxSalesCycleLagMonths: 12,
 } as const;
 
-/** Deliverability SOP used for the sending capacity card. */
+/**
+ * Myntmore sending ramp. Every domain gets the same schedule, and all domains are bought on day 1:
+ * - Day 1: buy the domain, create the first 2 ids, add them to Smartlead and start warm-up.
+ * - Warm up 14 days. The first 2 ids send from day 15.
+ * - Exactly one month later: add the other 2 ids, warm up 14 days. From day 15 of month 2 all 4 ids send.
+ * - Each id sends at most 25 emails a day. Ids send every day, and a month is counted as 30 days.
+ */
 export const SENDING_SOP = {
-  emailsPerMailboxPerDay: 25,
-  mailboxesPerDomain: 4,
-  sendingDaysPerMonth: 22,
-  warmupWeeks: 2,
+  emailsPerIdPerDay: 25,
+  idsPerDomain: 4,
+  /** Ids per domain created on day 1. The rest are added one month later. */
+  firstBatchIds: 2,
+  warmupDays: 14,
+  daysPerMonth: 30,
+  /** Month in which the second batch of ids is added. */
+  secondBatchMonth: 2,
 } as const;
 
 /* ------------------------------------------------------------------ */

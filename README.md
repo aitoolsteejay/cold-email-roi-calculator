@@ -22,6 +22,17 @@ npm run build
 | `src/components/site/` | Stand-in header, footer, badge, underline and SEO tags |
 | `src/pages/` | Page layout and SEO data |
 
+## Sending model
+
+The visitor enters the emails per day they want at full speed. `calculateSendingPlan` in `src/lib/coldEmailRoi.ts` then works day by day, using the rules in `SENDING_SOP`:
+
+- Domains needed = target / (4 ids x 25 emails), rounded up. All domains are bought on day 1.
+- Day 1: 2 ids per domain go into Smartlead and warm up for 14 days. They send from day 15.
+- Exactly one month later the other 2 ids are added and warmed for 14 days. All 4 send from day 15 of month 2.
+- Each id sends up to 25 emails a day, every day. A month is 30 days. A day never sends more than the target.
+
+For 1,000 a day that is 10 domains and 40 ids: month 1 sends 8,000, month 2 sends 23,000, and month 3 onward sends 30,000 a month.
+
 ## Moving it into the Next.js site
 
 1. Copy `data/coldEmailBenchmarks.ts`, `lib/coldEmailRoi.ts` (with its test), `lib/format.ts`, `lib/exportPdf.ts` and `components/calculator/` across.

@@ -11,7 +11,8 @@ import {
 } from "@/data/coldEmailBenchmarks";
 
 export interface RoiInputs {
-  monthlyEmails: number;
+  /** Emails per day wanted once every domain runs at full capacity. */
+  dailyEmailTarget: number;
   durationMonths: number;
   bounceRate: number;
   replyRate: number;
@@ -23,7 +24,6 @@ export interface RoiInputs {
   invoicesPerYear: number;
   retentionMonths: number;
   monthlyInvestment: number;
-  warmup: boolean;
   salesCycleLagMonths: number;
 }
 
@@ -37,8 +37,33 @@ export interface MonthPoint {
   profit: number;
 }
 
+/** A run of days within one month where the same number of ids send the same daily volume. */
+export interface SendSegment {
+  fromDay: number;
+  toDay: number;
+  idsSending: number;
+  emailsPerDay: number;
+}
+
+export interface SendMonth {
+  month: number;
+  sent: number;
+  segments: SendSegment[];
+}
+
+export interface SendingPlan {
+  domains: number;
+  ids: number;
+  /** Emails per day the infrastructure can send once all ids are live. */
+  fullCapacityPerDay: number;
+  /** Emails per day actually sent at full speed: the target, capped by capacity. */
+  fullSpeedPerDay: number;
+  months: SendMonth[];
+  totalSent: number;
+}
+
 export interface RoiResult {
-  sendMonths: number;
+  plan: SendingPlan;
   sent: number;
   delivered: number;
   replies: number;
@@ -110,13 +135,11 @@ export function meetingsPer1000(i: Pick<RoiInputs, "bounceRate" | "replyRate" | 
 
 export function calculateRoi(raw: RoiInputs): RoiResult {
   const months = Math.max(0, Math.floor(safeNumber(raw.durationMonths)));
-  const monthlyEmails = safeNumber(raw.monthlyEmails);
   const monthlyInvestment = safeNumber(raw.monthlyInvestment);
   const lag = Math.min(Math.floor(safeNumber(raw.salesCycleLagMonths)), MODEL.maxSalesCycleLagMonths);
-  const warmupFactor = raw.warmup ? MODEL.warmupFirstMonthFactor : 1;
 
-  const sendMonths = months === 0 ? 0 : months - (1 - warmupFactor);
-  const sent = monthlyEmails * sendMonths;
+  const plan = calculateSendingPlan(raw.dailyEmailTarget, months);
+  const sent = plan.totalSent;
   const delivered = sent * (1 - safeRate(raw.bounceRate) / 100);
   const replies = delivered * (safeRate(raw.replyRate) / 100);
   const positive = replies * (safeRate(raw.positiveShare) / 100);
@@ -131,10 +154,7 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
 
   // Month by month. Deals closed in month m are paid out in month m + lag; anything past the duration is dropped.
   const dealsClosedInMonth: number[] = [];
-  for (let m = 1; m <= months; m++) {
-    const volume = monthlyEmails * (m === 1 ? warmupFactor : 1);
-    dealsClosedInMonth.push(volume * fraction);
-  }
+  plan.months.forEach((m) => dealsClosedInMonth.push(m.sent * fraction));
   const revenueInMonth: number[] = new Array(months).fill(0);
   let dealsCounted = 0;
   dealsClosedInMonth.forEach((d, idx) => {
@@ -160,7 +180,7 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
   const roiRatio = div(revenue - cost, cost);
 
   return {
-    sendMonths,
+    plan,
     sent,
     delivered,
     replies,
@@ -183,13 +203,46 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
   };
 }
 
-/** Sending capacity from the deliverability SOP. */
-export function calculateSendingCapacity(monthlyEmails: number, sop = SENDING_SOP) {
-  const emails = safeNumber(monthlyEmails);
-  const perMailboxPerMonth = sop.emailsPerMailboxPerDay * sop.sendingDaysPerMonth;
-  const mailboxes = Math.ceil(emails / perMailboxPerMonth);
-  const domains = Math.ceil(mailboxes / sop.mailboxesPerDomain);
-  return { mailboxes, domains };
+/** Domains and ids needed so every domain runs at full capacity for the daily target. */
+export function calculateInfrastructure(dailyEmailTarget: number, sop = SENDING_SOP) {
+  const target = safeNumber(dailyEmailTarget);
+  const perDomainPerDay = sop.idsPerDomain * sop.emailsPerIdPerDay;
+  const domains = Math.ceil(target / perDomainPerDay);
+  const ids = domains * sop.idsPerDomain;
+  const fullCapacityPerDay = ids * sop.emailsPerIdPerDay;
+  return { domains, ids, fullCapacityPerDay, fullSpeedPerDay: Math.min(target, fullCapacityPerDay) };
+}
+
+/**
+ * Day by day sending volume over the duration, following the ramp in SENDING_SOP.
+ * Each day sends the lower of the daily target and what the live ids can send.
+ */
+export function calculateSendingPlan(dailyEmailTarget: number, durationMonths: number, sop = SENDING_SOP): SendingPlan {
+  const target = safeNumber(dailyEmailTarget);
+  const months = Math.max(0, Math.floor(safeNumber(durationMonths)));
+  const infra = calculateInfrastructure(target, sop);
+  const firstBatch = infra.domains * sop.firstBatchIds;
+  const secondBatch = infra.domains * (sop.idsPerDomain - sop.firstBatchIds);
+  const firstLiveDay = sop.warmupDays + 1;
+  const secondLiveDay = (sop.secondBatchMonth - 1) * sop.daysPerMonth + sop.warmupDays + 1;
+
+  const plan: SendMonth[] = [];
+  for (let m = 1; m <= months; m++) {
+    const segments: SendSegment[] = [];
+    let sent = 0;
+    for (let dayOfMonth = 1; dayOfMonth <= sop.daysPerMonth; dayOfMonth++) {
+      const day = (m - 1) * sop.daysPerMonth + dayOfMonth;
+      const idsSending = (day >= firstLiveDay ? firstBatch : 0) + (day >= secondLiveDay ? secondBatch : 0);
+      const emailsPerDay = Math.min(target, idsSending * sop.emailsPerIdPerDay);
+      sent += emailsPerDay;
+      const last = segments[segments.length - 1];
+      if (last && last.idsSending === idsSending && last.emailsPerDay === emailsPerDay) last.toDay = dayOfMonth;
+      else segments.push({ fromDay: dayOfMonth, toDay: dayOfMonth, idsSending, emailsPerDay });
+    }
+    plan.push({ month: m, sent, segments });
+  }
+
+  return { ...infra, months: plan, totalSent: plan.reduce((t, m) => t + m.sent, 0) };
 }
 
 /** The band a value falls in, or null when the metric has no bands. */

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { DEFAULT_STATE, type CalculatorState, type MetricKey } from "@/data/coldEmailBenchmarks";
-import { calculateRoi, calculateSendingCapacity } from "@/lib/coldEmailRoi";
+import { calculateRoi, calculateSendingPlan } from "@/lib/coldEmailRoi";
 
 export function useColdEmailCalculator() {
   const [state, setState] = useState<CalculatorState>(DEFAULT_STATE);
@@ -25,9 +25,13 @@ export function useColdEmailCalculator() {
     [state],
   );
 
-  const capacity = useMemo(() => calculateSendingCapacity(state.monthlyEmails), [state.monthlyEmails]);
+  /** Ramp for the sending card. Always covers 3 months so the climb to full speed is visible. */
+  const rampPlan = useMemo(
+    () => calculateSendingPlan(state.dailyEmailTarget, Math.max(state.durationMonths, 3)),
+    [state.dailyEmailTarget, state.durationMonths],
+  );
 
-  return { state, update, setRate, reset, result, capacity };
+  return { state, update, setRate, reset, result, rampPlan };
 }
 
 export type CalculatorApi = ReturnType<typeof useColdEmailCalculator>;

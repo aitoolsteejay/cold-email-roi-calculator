@@ -3,13 +3,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   COST_REFERENCE,
   CURRENCIES,
   DURATION_OPTIONS,
   INDUSTRIES,
   MODEL,
+  SENDING_SOP,
   POSITIVE_REPLY_RATE_REFERENCE,
 } from "@/data/coldEmailBenchmarks";
 import { stageCounts } from "@/lib/coldEmailRoi";
@@ -23,7 +23,8 @@ import type { CalculatorApi } from "./useColdEmailCalculator";
 const NO_INDUSTRY = "none";
 
 export function InputsPanel({ api }: { api: CalculatorApi }) {
-  const { state, update, setRate, reset, result, capacity } = api;
+  const { state, update, setRate, reset, result } = api;
+  const plan = result.plan;
   const currency = getCurrency(state.currency);
   const locale = currency.locale;
   const counts = stageCounts(result, state.bounceRate);
@@ -63,18 +64,18 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
           </div>
 
           <NumberField
-            id="monthlyEmails"
-            label="Monthly emails sent"
+            id="dailyEmailTarget"
+            label="Emails per day at full speed"
             labelClassName="font-semibold"
-            help="New cold emails sent per month across all mailboxes, follow ups included."
-            value={state.monthlyEmails}
-            onChange={(v) => update("monthlyEmails", v ?? 0)}
+            help={`The daily volume you want once every domain runs all ${SENDING_SOP.idsPerDomain} ids at ${SENDING_SOP.emailsPerIdPerDay} emails each. Months 1 and 2 send less while ids warm up.`}
+            value={state.dailyEmailTarget}
+            onChange={(v) => update("dailyEmailTarget", v ?? 0)}
             locale={locale}
             integer
-            placeholder="5,000"
+            placeholder="1,000"
             hint={
-              capacity.mailboxes > 0
-                ? `About ${formatInteger(capacity.mailboxes, locale)} mailboxes across ${formatInteger(capacity.domains, locale)} domains`
+              plan.domains > 0
+                ? `Needs ${formatInteger(plan.domains, locale)} ${plan.domains === 1 ? "domain" : "domains"} with ${formatInteger(plan.ids, locale)} ids. Full speed from day ${SENDING_SOP.warmupDays + 1} of month ${SENDING_SOP.secondBatchMonth}.`
                 : undefined
             }
           />
@@ -245,21 +246,6 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
           <AccordionItem value="advanced">
             <AccordionTrigger>Advanced</AccordionTrigger>
             <AccordionContent className="space-y-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="warmup">Account for warm-up</Label>
-                    <InfoTip label="Warm-up">
-                      New domains and mailboxes warm up for about {MODEL.warmupWeeks} weeks before real sending, so month one sends at{" "}
-                      {formatPercent(MODEL.warmupFirstMonthFactor * 100)} volume.
-                    </InfoTip>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Month one sends at {formatPercent(MODEL.warmupFirstMonthFactor * 100)} volume.
-                  </p>
-                </div>
-                <Switch id="warmup" checked={state.warmup} onCheckedChange={(v) => update("warmup", v)} />
-              </div>
               <NumberField
                 id="salesCycleLagMonths"
                 label="Sales cycle lag (months)"
