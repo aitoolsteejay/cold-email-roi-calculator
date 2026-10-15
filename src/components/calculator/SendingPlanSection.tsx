@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { ArrowRight, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DURATION_OPTIONS, SENDING_SOP } from "@/data/coldEmailBenchmarks";
@@ -73,14 +73,6 @@ export const SendingPlanSection = forwardRef<HTMLDivElement, { api: CalculatorAp
               </SelectContent>
             </Select>
           </div>
-
-          <a
-            href="/founder-meeting"
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#F5B731] bg-white px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-[#FFF8E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Book a call to set it up
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </a>
         </div>
 
         <div className="min-w-0 lg:col-span-8">
