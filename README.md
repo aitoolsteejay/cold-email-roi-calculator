@@ -27,13 +27,15 @@ npm run build
 The visitor fills in one volume box: emails per day or new prospects per month, both at full speed. The other is worked out (1,000 emails a day = 7,500 prospects a month, at 4 emails per prospect over a 30 day month). `calculateSendingPlan` in `src/lib/coldEmailRoi.ts` then works day by day, using the rules in `SENDING_SOP`:
 
 - Each prospect gets a first email and 3 follow ups, 5 days apart.
-- Ids needed = prospects per month / 150, rounded up to whole domains of 4 ids. All domains are bought on day 1.
+- Domains are sized so every id runs at full capacity: emails per day / (4 ids x 25 emails), rounded up. All domains are bought on day 1.
 - Day 1: 2 ids per domain go into Smartlead and warm up for 14 days. They go live on day 15.
 - Exactly one month later the other 2 ids are added and warmed for 14 days. They go live on day 15 of month 2.
-- When ids go live they get a campaign list: the monthly target split evenly across all ids (about 150 each). Everyone on the list gets the first email before any follow up goes out, at up to 25 emails per id a day. Follow ups then go out 5 days after the previous email, only slipping if a day's capacity is used up.
-- Each id gets a new list every 30 days from the day it went live. Ids send every day, and a month is 30 days.
+- Ids work through lists of about 150 prospects each. Everyone on a list gets the first email before any follow up, then the follow ups go out 5 days apart. As soon as a list is finished the same ids start the next one, so ids are never idle.
+- Ids send every day, and a month is 30 days.
 
 The funnel runs on prospects: bounce and reply rates are per prospect, across the whole sequence.
+
+Counts of people, meetings and deals are shown as whole numbers; the math underneath is not rounded.
 
 Revenue is paid month by month. A customer won in month m starts paying in month m + sales cycle lag and pays deal value x invoices per year / 12 every month until their retention period ends. Only payments inside the chosen duration count, so customers won late in the plan add less.
 
@@ -52,7 +54,7 @@ The sliders start at Myntmore's own 2026 Smartlead averages (pulled 15 October 2
 
 To refresh them, update those numbers in `src/data/coldEmailBenchmarks.ts`.
 
-For 7,500 prospects a month that is 13 domains and 52 ids. Month 1: a list of 3,750 on 26 ids on day 15 (10,400 emails that month). Month 2: month 1's follow ups finish by day 8, then a list of 7,500 on all 52 ids on day 15 (25,400 emails). Month 3 onwards: a list of 7,500 every month on day 15 (30,000 emails a month).
+For 1,000 emails a day (7,500 prospects a month) that is 10 domains and 40 ids. Month 1: 20 ids from day 15 send 8,000 emails to 3,000 new prospects. Month 2: 23,000 emails, 6,000 prospects. Month 3 onwards: 30,000 emails a month, about 7,500 new prospects a month (it varies a little as lists finish on different days).
 
 ## Moving it into the Next.js site
 

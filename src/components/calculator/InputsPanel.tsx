@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { COST_REFERENCE, CURRENCIES, MODEL, MYNTMORE_2026, POSITIVE_REPLY_RATE_REFERENCE } from "@/data/coldEmailBenchmarks";
 import { stageCounts } from "@/lib/coldEmailRoi";
-import { formatCount, formatInteger, formatMoney, formatPercent, getCurrency } from "@/lib/format";
+import { formatInteger, formatMoney, formatPercent, getCurrency } from "@/lib/format";
 import { DetailsPopover, DetailsSection, SourceLinks } from "./DetailsPopover";
 import { InfoTip } from "./InfoTip";
 import { Lines } from "./Lines";
@@ -104,11 +104,11 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
               <InfoTip label="Negative replies">Replies that are not interested. Always 100% minus the positive reply share.</InfoTip>
             </div>
             <span>
-              <span className="font-bold">{formatPercent(100 - state.positiveShare, locale)}</span> = {formatCount(counts.negative, locale)}
+              <span className="font-bold">{formatPercent(100 - state.positiveShare, locale)}</span> = {formatInteger(counts.negative, locale)}
             </span>
           </div>
 
-          <RateSlider metric="bookingRate" value={state.bookingRate} onChange={(v) => setRate("bookingRate", v)} count={counts.bookingRate} countNoun="meetings booked" wholeCount locale={locale} />
+          <RateSlider metric="bookingRate" value={state.bookingRate} onChange={(v) => setRate("bookingRate", v)} count={counts.bookingRate} countNoun="meetings booked" locale={locale} />
           <RateSlider metric="showRate" value={state.showRate} onChange={(v) => setRate("showRate", v)} count={counts.showRate} countNoun="meetings held" locale={locale} />
           <RateSlider metric="closeRate" value={state.closeRate} onChange={(v) => setRate("closeRate", v)} count={counts.closeRate} countNoun="deals closed" locale={locale} />
         </div>
@@ -189,7 +189,7 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
           </div>
           {state.salesCycleLagMonths > 0 && result.deals > result.dealsCounted && (
             <p className="text-xs text-muted-foreground">
-              {formatCount(result.deals - result.dealsCounted, locale)} deals land after month {state.durationMonths} and are not counted.
+              {formatInteger(result.deals - result.dealsCounted, locale)} deals land after month {state.durationMonths} and are not counted.
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">

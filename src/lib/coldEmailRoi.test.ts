@@ -27,100 +27,96 @@ const base: RoiInputs = {
   salesCycleLagMonths: 0,
 };
 
+const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
+
 describe("volume inputs", () => {
   it("converts emails per day and prospects per month through 4 emails and 30 days", () => {
     expect(prospectsFromDailyEmails(1000)).toBe(7500);
     expect(dailyEmailsFromProspects(7500)).toBe(1000);
   });
 
-  it("sizes ids at 150 prospects each, rounded up to whole domains of 4", () => {
-    // 7,500 / 150 = 50 ids, so 13 domains and 52 ids.
-    expect(calculateInfrastructure(7500)).toEqual({ domains: 13, ids: 52, prospectsPerMonth: 7500, emailsPerDay: 1000 });
+  it("sizes domains so every id runs at full capacity: 4 ids x 25 emails a day each", () => {
+    expect(calculateInfrastructure(7500)).toEqual({ domains: 10, ids: 40, prospectsPerMonth: 7500, emailsPerDay: 1000 });
+    // 1,050 a day needs 10.5 domains, rounded up to 11.
+    expect(calculateInfrastructure(prospectsFromDailyEmails(1050))).toMatchObject({ domains: 11, ids: 44 });
     expect(calculateInfrastructure(600)).toMatchObject({ domains: 1, ids: 4 });
-    expect(calculateInfrastructure(601)).toMatchObject({ domains: 2, ids: 8 });
     expect(calculateInfrastructure(0)).toMatchObject({ domains: 0, ids: 0 });
   });
 });
 
 describe("sending plan", () => {
-  const plan = calculateSendingPlan(7500, 4);
+  const plan = calculateSendingPlan(7500, 12);
 
-  it("records ids added and warm-up per month", () => {
-    expect(plan.months[0]).toMatchObject({ idsAdded: 26, warmupUntilDay: 14, idsSendingAtEnd: 26 });
-    expect(plan.months[1]).toMatchObject({ idsAdded: 26, warmupUntilDay: 14, idsSendingAtEnd: 52 });
-    expect(plan.months[2]).toMatchObject({ idsAdded: 0, warmupUntilDay: 0, idsSendingAtEnd: 52 });
+  it("records ids added, warm-up and who is sending each month", () => {
+    expect(plan.months[0]).toMatchObject({ idsAdded: 20, warmupUntilDay: 14, idsSendingAtEnd: 20 });
+    expect(plan.months[0].idSegments).toEqual([
+      { fromDay: 1, toDay: 14, idsSending: 0 },
+      { fromDay: 15, toDay: 30, idsSending: 20 },
+    ]);
+    expect(plan.months[1].idSegments).toEqual([
+      { fromDay: 1, toDay: 14, idsSending: 20 },
+      { fromDay: 15, toDay: 30, idsSending: 40 },
+    ]);
+    expect(plan.months[2]).toMatchObject({ idsAdded: 0, idSegments: [{ fromDay: 1, toDay: 30, idsSending: 40 }] });
   });
 
-  it("month 1: 26 ids go live on day 15 and get a list of 3,750", () => {
-    const c = plan.campaigns[0];
-    expect(c).toMatchObject({ launchDay: 15, ids: 26, listSize: 3750, firstEmailsPerDay: 650 });
-    // 3,750 first emails at 650 a day: days 15 to 20.
-    expect(c.firstEmailsFrom).toBe(15);
-    expect(c.firstEmailsTo).toBe(20);
-    expect(plan.months[0].prospects).toBe(3750);
+  it("never leaves ids idle once they are live", () => {
+    expect(plan.utilisation).toBeCloseTo(1, 9);
+    // Month 1: 20 ids x 25 x 16 days. Month 2: 20 ids x 25 x 30 + 20 ids x 25 x 16. Month 3 onwards: 1,000 a day.
+    expect(plan.months[0].sent).toBeCloseTo(8000, 6);
+    expect(plan.months[1].sent).toBeCloseTo(23000, 6);
+    plan.months.slice(2).forEach((m) => expect(m.sent).toBeCloseTo(30000, 6));
   });
 
-  it("sends every first email on a list before any of its follow ups", () => {
-    plan.campaigns.forEach((c) => {
-      if (c.followUpsFrom !== null) expect(c.followUpsFrom).toBeGreaterThanOrEqual(c.firstEmailsTo);
+  it("works through lists of 150 per id: first emails to everyone, then follow ups, then the next list", () => {
+    const groupOne = plan.campaigns.filter((c) => c.group === 1);
+    expect(groupOne[0]).toMatchObject({ ids: 20, listSize: 3000, launchDay: 15, firstEmailsDoneDay: 20 });
+    groupOne.slice(0, -1).forEach((c, i) => {
+      expect(c.completeDay).not.toBeNull();
+      // The next list starts the day the previous one finishes, or the day after.
+      expect(groupOne[i + 1].launchDay - (c.completeDay as number)).toBeLessThanOrEqual(1);
     });
   });
 
-  it("month 2: month 1's follow ups finish, then all 52 ids get a list of 7,500 on day 15", () => {
-    expect(plan.campaigns[0].complete).toBe(true);
-    expect(plan.campaigns[0].followUpsTo).toBeLessThan(45);
-    expect(plan.campaigns[1]).toMatchObject({ launchDay: 45, ids: 52, listSize: 7500, firstEmailsFrom: 45, firstEmailsTo: 50 });
-    expect(plan.months[1].prospects).toBe(7500);
+  it("follow ups slip by at most a day", () => {
+    expect(plan.maxFollowUpDelayDays).toBeLessThanOrEqual(1);
+    expect(calculateSendingPlan(600, 6).maxFollowUpDelayDays).toBeLessThanOrEqual(1);
   });
 
-  it("month 3 onwards runs at the full target", () => {
-    expect(plan.months[2]).toMatchObject({ prospects: 7500, sent: 30000 });
-    expect(plan.months[3]).toMatchObject({ prospects: 7500, sent: 30000 });
-  });
-
-  it("every list gets all 4 emails, and follow ups slip by at most a day", () => {
-    const long = calculateSendingPlan(7500, 13);
-    // All but the last list finish inside 13 months.
-    long.campaigns.slice(0, -1).forEach((c) => expect(c.complete).toBe(true));
-    const firstEmails = long.months.reduce((t, m) => t + m.prospects, 0);
-    const finished = long.campaigns.slice(0, -1).reduce((t, c) => t + c.listSize, 0);
-    expect(long.totalSent).toBeGreaterThanOrEqual(finished * 4);
-    expect(firstEmails).toBe(3750 + 12 * 7500);
-    expect(long.maxFollowUpDelayDays).toBeLessThanOrEqual(1);
+  it("averages the target number of new prospects once all ids are live", () => {
+    const later = plan.months.slice(2);
+    const average = later.reduce((t, m) => t + m.prospects, 0) / later.length;
+    expect(average).toBeGreaterThan(7500 * 0.95);
+    expect(average).toBeLessThan(7500 * 1.05);
   });
 });
 
 describe("calculateRoi", () => {
   it("runs the funnel on prospects reached", () => {
     const r = calculateRoi(base);
-    expect(r.prospects).toBe(3750 + 11 * 7500);
-    expect(r.sent).toBe(r.plan.months.reduce((t, m) => t + m.sent, 0));
-    expect(r.delivered).toBeCloseTo(86250 * 0.985, 6);
-    expect(Math.round(r.replies)).toBe(2889);
-    expect(Math.round(r.positive)).toBe(1155);
-    expect(Math.round(r.booked)).toBe(462);
-    expect(Math.round(r.held)).toBe(347);
-    expect(r.deals).toBeCloseTo(41.59, 2);
+    expect(r.prospects).toBeCloseTo(r.plan.totalProspects, 9);
+    expect(r.sent).toBeCloseTo(r.plan.totalSent, 9);
+    expect(r.delivered).toBeCloseTo(r.prospects * 0.985, 6);
+    expect(r.replies).toBeCloseTo(r.delivered * 0.034, 6);
+    expect(r.booked).toBeCloseTo(r.prospects * 0.985 * 0.034 * 0.4 * 0.4, 6);
+    expect(r.deals).toBeCloseTo(r.prospects * perProspect, 6);
     expect(r.cost).toBe(30000);
   });
 
   it("pays revenue month by month, so customers won late add less", () => {
     const r = calculateRoi(base);
-    const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
-    const prospectsByMonth = [3750, ...Array(11).fill(7500)];
     // $1,000 x 12 invoices / 12 = $1,000 a month per customer, paid from the month won to month 12.
-    const expected = prospectsByMonth.reduce((t, p, i) => t + p * perProspect * 1000 * (12 - i), 0);
+    const expected = r.plan.months.reduce((t, m, i) => t + m.prospects * perProspect * 1000 * (12 - i), 0);
     expect(r.revenue).toBeCloseTo(expected, 6);
     expect(r.revenue).toBeLessThan(r.deals * r.effectiveLTV);
-    // Cumulative chart line ends at the headline revenue.
     expect(r.monthly[11].revenue).toBeCloseTo(r.revenue, 6);
   });
 
   it("stops payments at the end of the retention period", () => {
     const r = calculateRoi({ ...base, retentionMonths: 3, durationMonths: 3 });
-    const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
+    const [m1, m2, m3] = r.plan.months.map((m) => m.prospects);
     // Month 1 customers pay 3 months, month 2 customers 2, month 3 customers 1.
-    expect(r.revenue).toBeCloseTo(perProspect * 1000 * (3750 * 3 + 7500 * 2 + 7500 * 1), 6);
+    expect(r.revenue).toBeCloseTo(perProspect * 1000 * (m1 * 3 + m2 * 2 + m3 * 1), 6);
   });
 
   it("does not pay back in month 1 when nothing sends until day 15", () => {
@@ -130,12 +126,10 @@ describe("calculateRoi", () => {
 
   it("builds meetings month by month from ramped prospects, not full speed", () => {
     const r = calculateRoi({ ...base, durationMonths: 3 });
-    expect(r.prospects).toBe(3750 + 7500 + 7500);
     const perMonth = r.plan.months.map((m) => m.prospects * bookedPerProspect(base));
-    expect(perMonth[0]).toBeCloseTo(3750 * 0.985 * 0.034 * 0.4 * 0.4, 9);
     expect(perMonth.reduce((a, b) => a + b, 0)).toBeCloseTo(r.booked, 9);
     // Full speed for all 3 months would have been 22,500 prospects.
-    expect(r.booked).toBeLessThan(22500 * bookedPerProspect(base));
+    expect(r.prospects).toBeLessThan(22500);
   });
 
   it("returns null ROI and no NaN when cost is zero", () => {
@@ -162,12 +156,10 @@ describe("calculateRoi", () => {
 
   it("drops deals that pay out after the duration ends", () => {
     const r = calculateRoi({ ...base, salesCycleLagMonths: 3 });
-    const countedShare = (3750 + 8 * 7500) / r.prospects;
-    expect(r.dealsCounted).toBeCloseTo(r.deals * countedShare, 6);
+    const counted = r.plan.months.slice(0, 9).reduce((t, m) => t + m.prospects, 0);
+    expect(r.dealsCounted).toBeCloseTo(counted * perProspect, 6);
     // Month 1 customers start paying in month 4, so they pay 9 months inside the 12.
-    const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
-    const prospectsByMonth = [3750, ...Array(8).fill(7500)];
-    const expected = prospectsByMonth.reduce((t, p, i) => t + p * perProspect * 1000 * (12 - (i + 3)), 0);
+    const expected = r.plan.months.slice(0, 9).reduce((t, m, i) => t + m.prospects * perProspect * 1000 * (12 - (i + 3)), 0);
     expect(r.revenue).toBeCloseTo(expected, 6);
   });
 

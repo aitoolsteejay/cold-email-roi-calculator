@@ -68,8 +68,8 @@ export function VolumeInput({ mode, onModeChange, dailyEmailTarget, monthlyProsp
         <div className="flex items-center gap-1.5">
           <span id="volume-mode-label" className="text-sm font-semibold">Set your volume by</span>
           <InfoTip label="Volume">
-            Fill in either box and the other is worked out. {sequence} Each id gets up to {SENDING_SOP.prospectsPerIdPerMonth} new prospects a
-            month so follow ups go out on time.
+            Fill in either box and the other is worked out. {sequence} Ids work through lists of about {SENDING_SOP.prospectsPerIdPerList}{" "}
+            prospects each, and start the next list as soon as one is done.
           </InfoTip>
         </div>
         <div role="radiogroup" aria-labelledby="volume-mode-label" className="grid grid-cols-2 rounded-lg bg-secondary p-1">

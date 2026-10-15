@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import type { Currency } from "@/data/coldEmailBenchmarks";
 import type { RoiResult } from "@/lib/coldEmailRoi";
-import { formatCount, formatInteger, formatMoney, formatPercent } from "@/lib/format";
+import { formatInteger, formatMoney, formatPercent } from "@/lib/format";
 import { Lines } from "./Lines";
 
 const BAR_STYLE = {
@@ -19,13 +19,13 @@ function barWidth(value: number, top: number) {
 
 export function ConversionFunnel({ result, currency }: { result: RoiResult; currency: Currency }) {
   const loc = currency.locale;
+  // Every stage counts people or meetings, so values show as whole numbers.
   const stages = [
     { label: "Prospects reached", value: result.prospects },
     { label: "Delivered", value: result.delivered },
     { label: "Replies", value: result.replies },
     { label: "Positive replies", value: result.positive },
-    // Meetings are whole events, so they show as whole numbers.
-    { label: "Meetings booked", value: result.booked, whole: true },
+    { label: "Meetings booked", value: result.booked },
     { label: "Meetings held", value: result.held },
     { label: "Deals closed", value: result.deals },
   ];
@@ -54,7 +54,7 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
               <div className="mb-1 flex items-center justify-between px-1">
                 <span className="text-sm font-semibold text-foreground">{s.label}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-base font-bold text-accent">{"whole" in s && s.whole ? formatInteger(s.value, loc) : formatCount(s.value, loc)}</span>
+                  <span className="text-base font-bold text-accent">{formatInteger(s.value, loc)}</span>
                   {step !== null && <span className="text-xs text-muted-foreground">({formatPercent(step, loc)})</span>}
                 </span>
               </div>

@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { BENCHMARKS, MYNTMORE_2026, SOFT_WARNING_COPY, type MetricKey } from "@/data/coldEmailBenchmarks";
 import { bandFor, isAboveBestPublished } from "@/lib/coldEmailRoi";
-import { decimalsForStep, formatCount, formatInteger, formatPercent } from "@/lib/format";
+import { decimalsForStep, formatInteger, formatPercent } from "@/lib/format";
 import { BandChip } from "./BandChip";
 import { DetailsPopover, DetailsSection, SourceLinks } from "./DetailsPopover";
 import { InfoTip } from "./InfoTip";
@@ -17,8 +17,6 @@ interface RateSliderProps {
   /** Count at the funnel stage this rate produces, shown as "= 2,009". */
   count: number;
   countNoun: string;
-  /** Show the count as a whole number (meetings cannot be fractional). */
-  wholeCount?: boolean;
   locale: string;
   /** Extra block for the details card, such as the positive reply rate. */
   details?: React.ReactNode;
@@ -29,9 +27,10 @@ function AvgTick({ className }: { className?: string }) {
   return <span aria-hidden="true" className={cn("inline-block h-2.5 w-[3px] rounded-full bg-[#16a34a]", className)} />;
 }
 
-export function RateSlider({ metric, value, onChange, count, countNoun, wholeCount, locale, details }: RateSliderProps) {
+export function RateSlider({ metric, value, onChange, count, countNoun, locale, details }: RateSliderProps) {
   const b = BENCHMARKS[metric];
-  const countText = wholeCount ? formatInteger(count, locale) : formatCount(count, locale);
+  // Counts are people or meetings, so they are always whole numbers. The math underneath is not rounded.
+  const countText = formatInteger(count, locale);
   // Show as many decimals as the slider step allows, e.g. 1.67% for bounce rate.
   const pct = (v: number) => formatPercent(v, locale, decimalsForStep(b.slider.step));
   const band = bandFor(metric, value);

@@ -1,24 +1,24 @@
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SENDING_SOP } from "@/data/coldEmailBenchmarks";
-import type { SendMonth, SendingPlan } from "@/lib/coldEmailRoi";
+import type { IdSegment, SendMonth, SendingPlan } from "@/lib/coldEmailRoi";
 import { formatInteger } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Lines } from "./Lines";
 
 interface MonthCard {
   title: string;
   month: SendMonth;
+  /** True for the card that stands for every month once all ids are live. */
   ongoing: boolean;
 }
 
-const close = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(1, Math.abs(b));
-
-/** Month 1, Month 2, ... then "Month N onwards" once the plan runs at the full target. */
+/** Month 1, Month 2, ... then "Month N onwards" from the first month every id sends all month. */
 function cardsFor(plan: SendingPlan): MonthCard[] {
   const cards: MonthCard[] = [];
   for (const m of plan.months) {
-    const full =
-      plan.prospectsPerMonth > 0 && close(m.prospects, plan.prospectsPerMonth) && close(m.sent, plan.prospectsPerMonth * SENDING_SOP.emailsPerProspect);
-    if (full) {
+    const allMonth = m.idSegments.length === 1 && m.idSegments[0].idsSending === plan.ids;
+    if (allMonth) {
       cards.push({ title: `Month ${m.month} onwards`, month: m, ongoing: true });
       break;
     }
@@ -27,91 +27,92 @@ function cardsFor(plan: SendingPlan): MonthCard[] {
   return cards;
 }
 
-type Kind = "warmup" | "first" | "followup";
+type Kind = "warmup" | "some" | "all";
 
 const KINDS: Record<Kind, { label: string; className: string }> = {
   warmup: { label: "Warm-up", className: "bg-muted-foreground/25" },
-  first: { label: "First emails", className: "bg-primary" },
-  followup: { label: "Follow-ups", className: "bg-[#16a34a]/70" },
+  some: { label: "Half the ids sending", className: "bg-primary/50" },
+  all: { label: "All ids sending", className: "bg-primary" },
 };
 
-interface Segment {
-  kind: Kind;
-  /** Days within the month, 1 to 30. */
-  from: number;
-  to: number;
-  detail: string;
+function kindOf(seg: IdSegment, totalIds: number): Kind {
+  if (seg.idsSending === 0) return "warmup";
+  return seg.idsSending >= totalIds ? "all" : "some";
 }
 
-/** What happens on which days of a month, for the timeline bar. */
-function segmentsFor(plan: SendingPlan, month: SendMonth, locale: string): Segment[] {
+/**
+ * One coloured stretch of the bar. Its details open on mouse hover, keyboard focus or tap,
+ * and close when the pointer leaves, focus moves on, or the visitor taps elsewhere.
+ */
+function BarSegment({ seg, kind, lines }: { seg: IdSegment; kind: Kind; lines: string[] }) {
+  const [open, setOpen] = useState(false);
   const days = SENDING_SOP.daysPerMonth;
-  const start = (month.month - 1) * days + 1;
-  const end = month.month * days;
-  const local = (abs: number) => abs - start + 1;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={lines.join(", ")}
+          onPointerEnter={(e) => e.pointerType === "mouse" && setOpen(true)}
+          onPointerLeave={(e) => e.pointerType === "mouse" && setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onClick={(e) => {
+            // Always open on click or tap; tapping elsewhere closes it.
+            e.preventDefault();
+            setOpen(true);
+          }}
+          className={cn(
+            "absolute inset-y-0 cursor-help transition-[filter] hover:brightness-95 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            KINDS[kind].className,
+          )}
+          style={{ left: `${((seg.fromDay - 1) / days) * 100}%`, width: `${((seg.toDay - seg.fromDay + 1) / days) * 100}%` }}
+        />
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="center"
+        className="pointer-events-none w-auto px-3 py-2 text-xs"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <Lines items={lines} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function Timeline({ month, plan, locale }: { month: SendMonth; plan: SendingPlan; locale: string }) {
+  const days = SENDING_SOP.daysPerMonth;
   const n = (v: number) => formatInteger(v, locale);
-  const segs: Segment[] = [];
-
-  const firstLaunch = plan.campaigns[0]?.launchDay ?? Infinity;
-  if (firstLaunch > start && firstLaunch <= end + 1) {
-    segs.push({ kind: "warmup", from: 1, to: local(firstLaunch - 1), detail: `Days 1 to ${local(firstLaunch - 1)}: ids warm up, nothing is sent` });
-  }
-
-  for (const c of plan.campaigns) {
-    const firstFrom = Math.max(c.firstEmailsFrom, start);
-    const firstTo = Math.min(c.firstEmailsTo, end);
-    if (firstFrom <= firstTo) {
-      segs.push({
-        kind: "first",
-        from: local(firstFrom),
-        to: local(firstTo),
-        detail: `Days ${local(firstFrom)} to ${local(firstTo)}: first emails to all ${n(c.listSize)} prospects, up to ${n(c.firstEmailsPerDay)} a day`,
-      });
-    }
-    if (c.followUpsFrom !== null && c.followUpsTo !== null) {
-      // Drawn from the day after the first emails finish, so the two never overlap on the bar.
-      const fuFrom = Math.max(c.followUpsFrom, c.firstEmailsTo + 1, start);
-      const fuTo = Math.min(c.followUpsTo, end);
-      if (fuFrom <= fuTo) {
-        segs.push({
-          kind: "followup",
-          from: local(fuFrom),
-          to: local(fuTo),
-          detail: `Days ${local(fuFrom)} to ${local(fuTo)}: follow ups${c.launchDay < start ? " for last month's list" : ""}`,
-        });
-      }
-    }
-  }
-  return segs.sort((a, b) => a.from - b.from);
-}
-
-function Timeline({ segments }: { segments: Segment[] }) {
-  const days = SENDING_SOP.daysPerMonth;
-  const launch = SENDING_SOP.warmupDays + 1;
+  const marks = [1, ...month.idSegments.slice(1).map((s) => s.fromDay), days];
   return (
     <div>
-      <div className="relative h-3 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
-        {segments.map((s) => (
-          <div
-            key={`${s.kind}-${s.from}`}
-            title={s.detail}
-            className={cn("absolute inset-y-0", KINDS[s.kind].className)}
-            style={{ left: `${((s.from - 1) / days) * 100}%`, width: `${((s.to - s.from + 1) / days) * 100}%` }}
-          />
-        ))}
+      <div className="relative h-4 overflow-hidden rounded-full bg-secondary">
+        {month.idSegments.map((seg) => {
+          const kind = kindOf(seg, plan.ids);
+          const lines =
+            kind === "warmup"
+              ? [`Days ${seg.fromDay} to ${seg.toDay}`, "Ids warm up, nothing is sent"]
+              : [
+                  `Days ${seg.fromDay} to ${seg.toDay}`,
+                  `${n(seg.idsSending)} ids sending`,
+                  `${n(seg.idsSending * plan.emailsPerIdPerDay)} emails a day`,
+                ];
+          return <BarSegment key={seg.fromDay} seg={seg} kind={kind} lines={lines} />;
+        })}
       </div>
       <div className="relative mt-1 h-3 text-[10px] text-muted-foreground" aria-hidden="true">
-        <span className="absolute left-0">Day 1</span>
-        <span className="absolute -translate-x-1/2" style={{ left: `${((launch - 0.5) / days) * 100}%` }}>
-          {launch}
-        </span>
-        <span className="absolute right-0">{days}</span>
-      </div>
-      <ul className="sr-only">
-        {segments.map((s) => (
-          <li key={`${s.kind}-${s.from}`}>{s.detail}</li>
+        {marks.map((d, i) => (
+          <span
+            key={d}
+            className={cn("absolute", i === 0 ? "left-0" : i === marks.length - 1 ? "right-0" : "-translate-x-1/2")}
+            style={i === 0 || i === marks.length - 1 ? undefined : { left: `${((d - 0.5) / days) * 100}%` }}
+          >
+            {i === 0 ? "Day 1" : d}
+          </span>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -123,7 +124,7 @@ interface Props {
   locale: string;
 }
 
-/** The ramp month by month: a 30 day bar showing warm-up, first emails and follow-ups, plus that month's totals. */
+/** The ramp month by month: a 30 day bar showing when ids warm up and send, plus the month's totals. */
 export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRamp({ rampPlan, durationPlan, durationMonths, locale }, ref) {
   const n = (v: number) => formatInteger(v, locale);
 
@@ -136,7 +137,7 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
   }
 
   const cards = cardsFor(rampPlan);
-  const launchDay = SENDING_SOP.warmupDays + 1;
+  const liveDay = SENDING_SOP.warmupDays + 1;
 
   return (
     <div ref={ref} className="space-y-3">
@@ -153,10 +154,14 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
         {cards.map(({ title, month, ongoing }) => {
           const idsLine =
             month.month === 1
-              ? `${n(month.idsAdded)} ids, live from day ${launchDay}`
+              ? `${n(month.idsAdded)} ids, live from day ${liveDay}`
               : month.idsAdded > 0
-                ? `+${n(month.idsAdded)} ids, live from day ${launchDay}`
-                : `All ${n(month.idsSendingAtEnd)} ids sending`;
+                ? `+${n(month.idsAdded)} ids, live from day ${liveDay}`
+                : `All ${n(rampPlan.ids)} ids, every day`;
+          // From the point every id is live, new prospects vary a little month to month as lists finish
+          // on different days, so the card shows the monthly average (the target).
+          const prospects = ongoing ? rampPlan.prospectsPerMonth : month.prospects;
+          const sent = ongoing ? rampPlan.emailsPerDay * SENDING_SOP.daysPerMonth : month.sent;
           return (
             <div key={title} className={cn("flex flex-col rounded-xl border p-4", ongoing ? "border-[#16a34a]/30 bg-[#16a34a]/5" : "border-border bg-secondary/20")}>
               <div className="mb-3">
@@ -166,16 +171,19 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
                 </p>
               </div>
 
-              <Timeline segments={segmentsFor(rampPlan, month, locale)} />
+              <Timeline month={month} plan={rampPlan} locale={locale} />
 
               <dl className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
                 <div className="flex items-baseline justify-between gap-2">
                   <dt className="text-muted-foreground">New prospects{ongoing ? " a month" : ""}</dt>
-                  <dd className="font-bold text-foreground">{n(month.prospects)}</dd>
+                  <dd className="font-bold text-foreground">
+                    {ongoing ? "~" : ""}
+                    {n(prospects)}
+                  </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-2">
                   <dt className="text-muted-foreground">Emails sent{ongoing ? " a month" : ""}</dt>
-                  <dd className="font-bold text-foreground">{n(month.sent)}</dd>
+                  <dd className="font-bold text-foreground">{n(sent)}</dd>
                 </div>
               </dl>
             </div>
