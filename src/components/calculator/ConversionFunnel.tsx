@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import type { Currency } from "@/data/coldEmailBenchmarks";
 import type { RoiResult } from "@/lib/coldEmailRoi";
-import { formatCount, formatMoney, formatPercent } from "@/lib/format";
+import { formatCount, formatInteger, formatMoney, formatPercent } from "@/lib/format";
 
 const BAR_STYLE = {
   background: "linear-gradient(135deg, rgb(255,201,71) 0%, rgb(255,182,39) 50%, rgb(255,165,0) 100%)",
@@ -19,7 +19,7 @@ function barWidth(value: number, top: number) {
 export function ConversionFunnel({ result, currency }: { result: RoiResult; currency: Currency }) {
   const loc = currency.locale;
   const stages = [
-    { label: "Emails sent", value: result.sent },
+    { label: "Prospects reached", value: result.prospects },
     { label: "Delivered", value: result.delivered },
     { label: "Replies", value: result.replies },
     { label: "Positive replies", value: result.positive },
@@ -32,13 +32,14 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
     <Card className="p-5 sm:p-6">
       <h3 className="mb-1 text-center text-xl font-bold text-foreground">Conversion Funnel</h3>
       <p className="mb-6 text-center text-xs text-muted-foreground">
-        Bars show share of emails sent. Brackets show conversion from the step above.
+        {formatInteger(result.sent, loc)} emails to {formatInteger(result.prospects, loc)} prospects. Bars show share of prospects reached.
+        Brackets show conversion from the step above.
       </p>
       <ol className="mx-auto w-full max-w-md space-y-1.5">
         {stages.map((s, i) => {
           const prev = i === 0 ? null : stages[i - 1].value;
           const step = prev && prev > 0 ? (s.value / prev) * 100 : null;
-          const ofSent = result.sent > 0 ? (s.value / result.sent) * 100 : 0;
+          const ofSent = result.prospects > 0 ? (s.value / result.prospects) * 100 : 0;
           return (
             <li key={s.label}>
               <div className="mb-1 flex items-center justify-between px-1">
@@ -52,7 +53,7 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
                 <div
                   data-pdf-flat
                   className="relative flex h-11 items-center justify-center rounded-2xl transition-all duration-500 ease-out"
-                  style={{ ...BAR_STYLE, width: `${barWidth(s.value, result.sent)}%` }}
+                  style={{ ...BAR_STYLE, width: `${barWidth(s.value, result.prospects)}%` }}
                 >
                   <span className="text-sm font-bold text-gray-900">{formatPercent(ofSent, loc)}</span>
                 </div>

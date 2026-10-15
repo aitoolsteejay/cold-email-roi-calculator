@@ -9,21 +9,21 @@ import {
   DURATION_OPTIONS,
   INDUSTRIES,
   MODEL,
-  SENDING_SOP,
   POSITIVE_REPLY_RATE_REFERENCE,
 } from "@/data/coldEmailBenchmarks";
 import { stageCounts } from "@/lib/coldEmailRoi";
-import { formatCount, formatInteger, formatMoney, formatPercent, getCurrency } from "@/lib/format";
+import { formatCount, formatMoney, formatPercent, getCurrency } from "@/lib/format";
 import { InfoTip } from "./InfoTip";
 import { NumberField } from "./NumberField";
 import { RateSlider } from "./RateSlider";
+import { VolumeInput } from "./VolumeInput";
 import { SourcesPopover } from "./SourcesPopover";
 import type { CalculatorApi } from "./useColdEmailCalculator";
 
 const NO_INDUSTRY = "none";
 
 export function InputsPanel({ api }: { api: CalculatorApi }) {
-  const { state, update, setRate, reset, result } = api;
+  const { state, update, setRate, setVolumeMode, reset, result } = api;
   const plan = result.plan;
   const currency = getCurrency(state.currency);
   const locale = currency.locale;
@@ -63,21 +63,14 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
             </Select>
           </div>
 
-          <NumberField
-            id="dailyEmailTarget"
-            label="Emails per day at full speed"
-            labelClassName="font-semibold"
-            help={`The daily volume you want once every domain runs all ${SENDING_SOP.idsPerDomain} ids at ${SENDING_SOP.emailsPerIdPerDay} emails each. Months 1 and 2 send less while ids warm up.`}
-            value={state.dailyEmailTarget}
-            onChange={(v) => update("dailyEmailTarget", v ?? 0)}
+          <VolumeInput
+            mode={state.volumeMode}
+            onModeChange={setVolumeMode}
+            dailyEmailTarget={state.dailyEmailTarget}
+            monthlyProspectTarget={state.monthlyProspectTarget}
+            onChange={(mode, v) => update(mode === "emails" ? "dailyEmailTarget" : "monthlyProspectTarget", v)}
+            plan={plan}
             locale={locale}
-            integer
-            placeholder="1,000"
-            hint={
-              plan.domains > 0
-                ? `Needs ${formatInteger(plan.domains, locale)} ${plan.domains === 1 ? "domain" : "domains"} with ${formatInteger(plan.ids, locale)} ids. Full speed from day ${SENDING_SOP.warmupDays + 1} of month ${SENDING_SOP.secondBatchMonth}.`
-                : undefined
-            }
           />
 
           <div className="space-y-2">
@@ -127,7 +120,7 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
             </Select>
           </div>
 
-          <RateSlider metric="bounceRate" value={state.bounceRate} onChange={(v) => setRate("bounceRate", v)} count={counts.bounceRate} countNoun="bounced" locale={locale} />
+          <RateSlider metric="bounceRate" value={state.bounceRate} onChange={(v) => setRate("bounceRate", v)} count={counts.bounceRate} countNoun="prospects bounced" locale={locale} />
 
           <RateSlider
             metric="replyRate"

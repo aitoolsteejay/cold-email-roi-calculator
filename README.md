@@ -24,14 +24,18 @@ npm run build
 
 ## Sending model
 
-The visitor enters the emails per day they want at full speed. `calculateSendingPlan` in `src/lib/coldEmailRoi.ts` then works day by day, using the rules in `SENDING_SOP`:
+The visitor fills in one volume box: emails per day or new prospects per month, both at full speed. The other is worked out (1,000 emails a day = 7,500 prospects a month, at 4 emails per prospect over a 30 day month). `calculateSendingPlan` in `src/lib/coldEmailRoi.ts` then works day by day, using the rules in `SENDING_SOP`:
 
-- Domains needed = target / (4 ids x 25 emails), rounded up. All domains are bought on day 1.
+- Each prospect gets a first email and 3 follow ups, 5 days apart.
+- Each id gets up to 150 new prospects a month (5 a day). At 4 emails each that is about 20 emails a day, under the 25 cap, so follow ups go out on time.
+- Ids needed = prospects per month / 150, rounded up to whole domains of 4 ids. All domains are bought on day 1.
 - Day 1: 2 ids per domain go into Smartlead and warm up for 14 days. They send from day 15.
 - Exactly one month later the other 2 ids are added and warmed for 14 days. All 4 send from day 15 of month 2.
-- Each id sends up to 25 emails a day, every day. A month is 30 days. A day never sends more than the target.
+- Ids send every day, and a month is 30 days.
 
-For 1,000 a day that is 10 domains and 40 ids: month 1 sends 8,000, month 2 sends 23,000, and month 3 onward sends 30,000 a month.
+The funnel runs on prospects: bounce and reply rates are per prospect, across the whole sequence.
+
+For 7,500 prospects a month that is 13 domains and 52 ids. Month 1 reaches 2,080 prospects with 4,420 emails, month 2 reaches 5,820 with 19,680, and month 3 onward reaches 7,500 with 30,000 a month.
 
 ## Moving it into the Next.js site
 

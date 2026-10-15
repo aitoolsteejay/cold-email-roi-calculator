@@ -54,14 +54,14 @@ export function StatRow({ result, currency, hasInvestment }: Props) {
         <Stat
           icon={Gauge}
           color="#14B8A6"
-          label="Meetings per 1,000 sent"
-          value={formatCount(result.meetingsPer1000, loc)}
-          help="Meetings booked for every 1,000 emails sent. A quick sanity check against published benchmarks."
+          label="Meetings per 1,000 prospects"
+          value={formatCount(result.meetingsPer1000Prospects, loc)}
+          help="Meetings booked for every 1,000 prospects reached with the full sequence."
         />
       </div>
       <p className="flex items-start gap-1 text-xs leading-snug text-muted-foreground">
         <span>
-          <span className="font-semibold text-foreground/70">Meetings per 1,000 emails:</span> {MEETINGS_PER_1000_REFERENCE.text}
+          <span className="font-semibold text-foreground/70">Published benchmark:</span> {MEETINGS_PER_1000_REFERENCE.text}
         </span>
         <SourcesPopover title="Meetings per 1,000 emails" sources={[MEETINGS_PER_1000_REFERENCE.source]} />
       </p>

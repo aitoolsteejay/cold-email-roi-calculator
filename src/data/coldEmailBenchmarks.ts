@@ -57,7 +57,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
     key: "bounceRate",
     label: "Bounce rate",
     unit: "%",
-    appliesTo: "of emails sent",
+    appliesTo: "of prospects",
     defaultValue: 1.5,
     bands: [
       { label: "Healthy", min: 0, max: 2, tone: "good" },
@@ -78,13 +78,13 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       },
     ],
     slider: { min: 0, max: 10, step: 0.1 },
-    help: "Share of emails that never arrive because the address is invalid or the mailbox is full. Emails delivered = emails sent x (1 - bounce rate).",
+    help: "Share of prospects whose address bounces because it is invalid or the mailbox is full. Prospects delivered = prospects reached x (1 - bounce rate).",
   },
   replyRate: {
     key: "replyRate",
     label: "Reply rate",
     unit: "%",
-    appliesTo: "of delivered emails",
+    appliesTo: "of delivered prospects",
     defaultValue: 3.4,
     bands: [
       { label: "Below average", min: 0, max: 2, tone: "warn" },
@@ -118,7 +118,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
     ],
     slider: { min: 0, max: 15, step: 0.1 },
     warnAbove: 10,
-    help: "Share of delivered emails that get any reply, including not interested and out of office style replies.",
+    help: "Share of delivered prospects who reply at any point in the sequence (first email or any follow up), including not interested replies.",
   },
   positiveShare: {
     key: "positiveShare",
@@ -288,11 +288,17 @@ export const DURATION_OPTIONS: { months: number; label: string }[] = [
   { months: 12, label: "12 Months" },
 ];
 
+export type VolumeMode = "emails" | "prospects";
+
 export interface CalculatorState {
   currency: string;
   industry: string | null;
-  /** Emails per day the visitor wants once every domain runs at full capacity. */
+  /** Which volume box the visitor fills in. The other is calculated. */
+  volumeMode: VolumeMode;
+  /** Emails per day at full speed, used when volumeMode is "emails". */
   dailyEmailTarget: number;
+  /** New prospects per month at full speed, used when volumeMode is "prospects". */
+  monthlyProspectTarget: number;
   durationMonths: number;
   bounceRate: number;
   replyRate: number;
@@ -311,7 +317,9 @@ export interface CalculatorState {
 export const DEFAULT_STATE: CalculatorState = {
   currency: "USD",
   industry: null,
+  volumeMode: "emails",
   dailyEmailTarget: 1000,
+  monthlyProspectTarget: 7500,
   durationMonths: 12,
   bounceRate: BENCHMARKS.bounceRate.defaultValue,
   replyRate: BENCHMARKS.replyRate.defaultValue,
@@ -341,9 +349,15 @@ export const MODEL = {
  * - Warm up 14 days. The first 2 ids send from day 15.
  * - Exactly one month later: add the other 2 ids, warm up 14 days. From day 15 of month 2 all 4 ids send.
  * - Each id sends at most 25 emails a day. Ids send every day, and a month is counted as 30 days.
+ * - Each prospect gets a first email plus 3 follow ups, 5 days apart.
+ * - Each id is given about 150 new prospects a month, so follow ups always go out on time.
  */
 export const SENDING_SOP = {
   emailsPerIdPerDay: 25,
+  /** First email plus follow ups. */
+  emailsPerProspect: 4,
+  followUpGapDays: 5,
+  prospectsPerIdPerMonth: 150,
   idsPerDomain: 4,
   /** Ids per domain created on day 1. The rest are added one month later. */
   firstBatchIds: 2,

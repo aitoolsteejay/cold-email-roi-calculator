@@ -35,8 +35,8 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
         subtitle: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
         assumptions: [
           ...(industry ? [`Industry: ${industry}`] : []),
-          `Emails per day at full speed: ${formatInteger(state.dailyEmailTarget, currency.locale)}`,
-          `Domains: ${formatInteger(result.plan.domains, currency.locale)}  |  Ids: ${formatInteger(result.plan.ids, currency.locale)}`,
+          `Full speed: ${formatInteger(result.plan.prospectsPerMonth, currency.locale)} prospects/month, ${formatInteger(result.plan.emailsPerDay, currency.locale)} emails/day`,
+          `Domains: ${formatInteger(result.plan.domains, currency.locale)}  |  Ids: ${formatInteger(result.plan.ids, currency.locale)}  |  4 emails per prospect`,
           `Duration: ${DURATION_OPTIONS.find((d) => d.months === state.durationMonths)?.label ?? `${state.durationMonths} months`}`,
           ...RATE_ORDER.map((k) => `${BENCHMARKS[k].label}: ${formatPercent(state[k])}`),
           `Average deal value: ${money(state.dealValue)}`,

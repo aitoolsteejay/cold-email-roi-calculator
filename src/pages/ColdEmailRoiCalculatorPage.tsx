@@ -36,7 +36,7 @@ const PROBLEMS = [
 ];
 
 const STEPS = [
-  { icon: MousePointer, color: "#16a34a", title: "Enter your funnel numbers", body: "Volume, reply rate, meeting and close rates, deal size and cost. Each rate shows how it compares to 2026 benchmarks." },
+  { icon: MousePointer, color: "#16a34a", title: "Enter your funnel numbers", body: "Emails per day or prospects per month, then reply, meeting and close rates, deal size and cost. Each rate is checked against 2026 benchmarks." },
   { icon: Zap, color: "#3B82F6", title: "Watch it calculate live", body: "Meetings, deals, revenue and ROI update instantly as you move a slider." },
   { icon: CircleCheckBig, color: "#10B981", title: "Export it as a PDF", body: "A clean report you can bring to a budget conversation or a client call." },
 ];
@@ -130,8 +130,8 @@ export function ColdEmailRoiCalculatorPage() {
           <div className="mx-auto max-w-4xl text-center">
             <h2 className="mb-8 text-3xl font-black sm:text-5xl">See The Full Funnel, Not Just A Guess</h2>
             <p className="text-lg leading-relaxed text-muted-foreground md:text-xl">
-              Follow every email from sent to delivered, replies, positive replies, meetings booked, meetings held and deals, all the way
-              through to revenue and ROI. Then export it as a PDF to share.
+              Follow every prospect from first email and follow ups to delivered, replies, positive replies, meetings booked, meetings held
+              and deals, all the way through to revenue and ROI. Then export it as a PDF to share.
             </p>
           </div>
         </section>

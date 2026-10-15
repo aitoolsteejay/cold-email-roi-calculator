@@ -1,6 +1,7 @@
 /**
  * Pure cold email ROI math. No React, no formatting, no rounding.
  * Rates are percentages (3.4 means 3.4%). Everything stays unrounded until display.
+ * The funnel runs on prospects: bounce and reply rates are per prospect, across the whole email sequence.
  */
 import {
   BENCHMARKS,
@@ -11,8 +12,8 @@ import {
 } from "@/data/coldEmailBenchmarks";
 
 export interface RoiInputs {
-  /** Emails per day wanted once every domain runs at full capacity. */
-  dailyEmailTarget: number;
+  /** New prospects per month wanted once every domain runs at full speed. */
+  monthlyProspectTarget: number;
   durationMonths: number;
   bounceRate: number;
   replyRate: number;
@@ -37,16 +38,19 @@ export interface MonthPoint {
   profit: number;
 }
 
-/** A run of days within one month where the same number of ids send the same daily volume. */
+/** A run of days within one month where the same ids start the same number of new prospects a day. */
 export interface SendSegment {
   fromDay: number;
   toDay: number;
   idsSending: number;
-  emailsPerDay: number;
+  newProspectsPerDay: number;
 }
 
 export interface SendMonth {
   month: number;
+  /** New prospects who got their first email this month. */
+  prospects: number;
+  /** All emails sent this month: first emails plus follow ups. */
   sent: number;
   segments: SendSegment[];
 }
@@ -54,16 +58,20 @@ export interface SendMonth {
 export interface SendingPlan {
   domains: number;
   ids: number;
-  /** Emails per day the infrastructure can send once all ids are live. */
-  fullCapacityPerDay: number;
-  /** Emails per day actually sent at full speed: the target, capped by capacity. */
-  fullSpeedPerDay: number;
+  /** New prospects per month at full speed (the target). */
+  prospectsPerMonth: number;
+  /** Average emails per day at full speed. */
+  emailsPerDay: number;
   months: SendMonth[];
+  totalProspects: number;
   totalSent: number;
 }
 
 export interface RoiResult {
   plan: SendingPlan;
+  /** New prospects reached over the duration. */
+  prospects: number;
+  /** Emails sent over the duration. */
   sent: number;
   delivered: number;
   replies: number;
@@ -81,7 +89,7 @@ export interface RoiResult {
   cost: number;
   /** Null when cost is zero. */
   roiPercent: number | null;
-  meetingsPer1000: number;
+  meetingsPer1000Prospects: number;
   costPerBookedMeeting: number | null;
   costPerCustomer: number | null;
   /** First month cumulative profit is above zero. Null when it never is. */
@@ -127,8 +135,8 @@ export function calculateLtv(i: Pick<RoiInputs, "dealValue" | "invoicesPerYear" 
   };
 }
 
-/** Meetings booked per 1,000 emails sent, from the rates alone. */
-export function meetingsPer1000(i: Pick<RoiInputs, "bounceRate" | "replyRate" | "positiveShare" | "bookingRate">): number {
+/** Meetings booked per 1,000 prospects reached, from the rates alone. */
+export function meetingsPer1000Prospects(i: Pick<RoiInputs, "bounceRate" | "replyRate" | "positiveShare" | "bookingRate">): number {
   const p = (v: number) => safeRate(v) / 100;
   return 1000 * (1 - p(i.bounceRate)) * p(i.replyRate) * p(i.positiveShare) * p(i.bookingRate);
 }
@@ -138,9 +146,10 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
   const monthlyInvestment = safeNumber(raw.monthlyInvestment);
   const lag = Math.min(Math.floor(safeNumber(raw.salesCycleLagMonths)), MODEL.maxSalesCycleLagMonths);
 
-  const plan = calculateSendingPlan(raw.dailyEmailTarget, months);
+  const plan = calculateSendingPlan(raw.monthlyProspectTarget, months);
+  const prospects = plan.totalProspects;
   const sent = plan.totalSent;
-  const delivered = sent * (1 - safeRate(raw.bounceRate) / 100);
+  const delivered = prospects * (1 - safeRate(raw.bounceRate) / 100);
   const replies = delivered * (safeRate(raw.replyRate) / 100);
   const positive = replies * (safeRate(raw.positiveShare) / 100);
   const negative = replies - positive;
@@ -154,7 +163,7 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
 
   // Month by month. Deals closed in month m are paid out in month m + lag; anything past the duration is dropped.
   const dealsClosedInMonth: number[] = [];
-  plan.months.forEach((m) => dealsClosedInMonth.push(m.sent * fraction));
+  plan.months.forEach((m) => dealsClosedInMonth.push(m.prospects * fraction));
   const revenueInMonth: number[] = new Array(months).fill(0);
   let dealsCounted = 0;
   dealsClosedInMonth.forEach((d, idx) => {
@@ -181,6 +190,7 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
 
   return {
     plan,
+    prospects,
     sent,
     delivered,
     replies,
@@ -195,7 +205,7 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
     revenue,
     cost,
     roiPercent: roiRatio === null ? null : roiRatio * 100,
-    meetingsPer1000: meetingsPer1000(raw),
+    meetingsPer1000Prospects: meetingsPer1000Prospects(raw),
     costPerBookedMeeting: div(cost, booked),
     costPerCustomer: div(cost, deals),
     paybackMonth,
@@ -203,46 +213,77 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
   };
 }
 
-/** Domains and ids needed so every domain runs at full capacity for the daily target. */
-export function calculateInfrastructure(dailyEmailTarget: number, sop = SENDING_SOP) {
-  const target = safeNumber(dailyEmailTarget);
-  const perDomainPerDay = sop.idsPerDomain * sop.emailsPerIdPerDay;
-  const domains = Math.ceil(target / perDomainPerDay);
-  const ids = domains * sop.idsPerDomain;
-  const fullCapacityPerDay = ids * sop.emailsPerIdPerDay;
-  return { domains, ids, fullCapacityPerDay, fullSpeedPerDay: Math.min(target, fullCapacityPerDay) };
+/** Emails per day and prospects per month convert through the sequence length and a 30 day month. */
+export function prospectsFromDailyEmails(dailyEmails: number, sop = SENDING_SOP): number {
+  return (safeNumber(dailyEmails) * sop.daysPerMonth) / sop.emailsPerProspect;
+}
+
+export function dailyEmailsFromProspects(monthlyProspects: number, sop = SENDING_SOP): number {
+  return (safeNumber(monthlyProspects) * sop.emailsPerProspect) / sop.daysPerMonth;
+}
+
+/** Ids at about 150 new prospects each a month, rounded up to whole domains of 4 ids. */
+export function calculateInfrastructure(monthlyProspectTarget: number, sop = SENDING_SOP) {
+  const prospects = safeNumber(monthlyProspectTarget);
+  const idsNeeded = Math.ceil(prospects / sop.prospectsPerIdPerMonth);
+  const domains = Math.ceil(idsNeeded / sop.idsPerDomain);
+  return {
+    domains,
+    ids: domains * sop.idsPerDomain,
+    prospectsPerMonth: prospects,
+    emailsPerDay: dailyEmailsFromProspects(prospects, sop),
+  };
 }
 
 /**
- * Day by day sending volume over the duration, following the ramp in SENDING_SOP.
- * Each day sends the lower of the daily target and what the live ids can send.
+ * Day by day plan over the duration, following the ramp in SENDING_SOP.
+ * Each day, live ids start new prospects (target / 30, capped at 150 a month per live id),
+ * and every earlier prospect gets its follow ups 5, 10 and 15 days after the first email.
+ * Daily sends never go above live ids x 25.
  */
-export function calculateSendingPlan(dailyEmailTarget: number, durationMonths: number, sop = SENDING_SOP): SendingPlan {
-  const target = safeNumber(dailyEmailTarget);
+export function calculateSendingPlan(monthlyProspectTarget: number, durationMonths: number, sop = SENDING_SOP): SendingPlan {
+  const infra = calculateInfrastructure(monthlyProspectTarget, sop);
   const months = Math.max(0, Math.floor(safeNumber(durationMonths)));
-  const infra = calculateInfrastructure(target, sop);
+  const totalDays = months * sop.daysPerMonth;
+  const targetPerDay = infra.prospectsPerMonth / sop.daysPerMonth;
+  const perIdPerDay = sop.prospectsPerIdPerMonth / sop.daysPerMonth;
   const firstBatch = infra.domains * sop.firstBatchIds;
   const secondBatch = infra.domains * (sop.idsPerDomain - sop.firstBatchIds);
   const firstLiveDay = sop.warmupDays + 1;
   const secondLiveDay = (sop.secondBatchMonth - 1) * sop.daysPerMonth + sop.warmupDays + 1;
+  const followUpOffsets = Array.from({ length: sop.emailsPerProspect - 1 }, (_, i) => (i + 1) * sop.followUpGapDays);
 
+  // newOnDay[d] = prospects whose first email goes out on day d (1-based).
+  const newOnDay: number[] = new Array(totalDays + 1).fill(0);
   const plan: SendMonth[] = [];
+
   for (let m = 1; m <= months; m++) {
     const segments: SendSegment[] = [];
+    let prospects = 0;
     let sent = 0;
     for (let dayOfMonth = 1; dayOfMonth <= sop.daysPerMonth; dayOfMonth++) {
       const day = (m - 1) * sop.daysPerMonth + dayOfMonth;
       const idsSending = (day >= firstLiveDay ? firstBatch : 0) + (day >= secondLiveDay ? secondBatch : 0);
-      const emailsPerDay = Math.min(target, idsSending * sop.emailsPerIdPerDay);
-      sent += emailsPerDay;
+      const followUps = followUpOffsets.reduce((t, off) => t + (day - off >= 1 ? newOnDay[day - off] : 0), 0);
+      const capacity = idsSending * sop.emailsPerIdPerDay;
+      const fresh = Math.max(0, Math.min(targetPerDay, idsSending * perIdPerDay, capacity - followUps));
+      newOnDay[day] = fresh;
+      prospects += fresh;
+      sent += fresh + Math.min(followUps, capacity);
+
       const last = segments[segments.length - 1];
-      if (last && last.idsSending === idsSending && last.emailsPerDay === emailsPerDay) last.toDay = dayOfMonth;
-      else segments.push({ fromDay: dayOfMonth, toDay: dayOfMonth, idsSending, emailsPerDay });
+      if (last && last.idsSending === idsSending && last.newProspectsPerDay === fresh) last.toDay = dayOfMonth;
+      else segments.push({ fromDay: dayOfMonth, toDay: dayOfMonth, idsSending, newProspectsPerDay: fresh });
     }
-    plan.push({ month: m, sent, segments });
+    plan.push({ month: m, prospects, sent, segments });
   }
 
-  return { ...infra, months: plan, totalSent: plan.reduce((t, m) => t + m.sent, 0) };
+  return {
+    ...infra,
+    months: plan,
+    totalProspects: plan.reduce((t, m) => t + m.prospects, 0),
+    totalSent: plan.reduce((t, m) => t + m.sent, 0),
+  };
 }
 
 /** The band a value falls in, or null when the metric has no bands. */
@@ -259,7 +300,7 @@ export function isAboveBestPublished(metric: MetricKey, value: number): boolean 
 
 /** Counts of the stage each rate slider acts on, used for the "3.4% = 2,009" readout. */
 export function stageCounts(r: RoiResult, bounceRate: number) {
-  const bounced = r.sent * (safeRate(bounceRate) / 100);
+  const bounced = r.prospects * (safeRate(bounceRate) / 100);
   return {
     bounceRate: bounced,
     replyRate: r.replies,
