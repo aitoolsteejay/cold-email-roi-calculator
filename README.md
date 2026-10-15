@@ -29,3 +29,12 @@ npm run build
 3. Drop `components/site/SiteHeader`, `SiteFooter` and `Seo`, and use the site's layout. Turn `pages/seo.ts` into `export const metadata` and render the JSON-LD with a script tag.
 4. Add `"use client"` to `ColdEmailRoiCalculator.tsx` and the components it imports.
 5. Create `app/tools/cold-email-roi-calculator/page.tsx` from `pages/ColdEmailRoiCalculatorPage.tsx`. Pass the site's logo path to `<ColdEmailRoiCalculator logoSrc=... />`.
+
+## Deploying to Vercel
+
+The repo is ready to import into Vercel as is. `vercel.json` sets the Vite framework, `npm ci`, `npm run build` and the `dist` output, so no dashboard settings are needed.
+
+- `/` redirects to `/tools/cold-email-roi-calculator`.
+- Every other path falls back to `index.html` so client-side routes load. Hashed files in `/assets` are cached for a year.
+- Node 20.19 or newer is required (set in `package.json` `engines`).
+- The canonical URL and Open Graph tags point to `https://www.myntmore.com/tools/cold-email-roi-calculator`. Change `SITE_URL` in `src/pages/seo.ts` if this deployment should be the canonical page.
