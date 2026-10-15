@@ -281,8 +281,8 @@ export const CURRENCIES: Currency[] = [
   { code: "CAD", symbol: "C$", label: "CAD - Canadian Dollar", locale: "en-US" },
 ];
 
+/** No 1 month option: it takes about 2 months to get all domains and ids live (see SENDING_SOP). */
 export const DURATION_OPTIONS: { months: number; label: string }[] = [
-  { months: 1, label: "1 Month" },
   { months: 3, label: "3 Months" },
   { months: 6, label: "6 Months" },
   { months: 12, label: "12 Months" },
