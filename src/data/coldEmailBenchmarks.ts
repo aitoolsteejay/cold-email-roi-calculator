@@ -1,0 +1,429 @@
+/**
+ * All benchmark data, defaults and model constants for the cold email ROI calculator.
+ * The UI and lib/coldEmailRoi.ts import from here. Nothing numeric should live in components.
+ *
+ * Rates are stored as percentages (3.4 means 3.4%).
+ */
+
+export type MetricKey =
+  | "bounceRate"
+  | "replyRate"
+  | "positiveShare"
+  | "bookingRate"
+  | "showRate"
+  | "closeRate";
+
+/** Visual tone for a "where you stand" chip. */
+export type BandTone = "warn" | "average" | "good" | "great" | "bad";
+
+export interface Band {
+  label: string;
+  /** Inclusive lower bound, in percent. */
+  min: number;
+  /** Exclusive upper bound, in percent. The last band uses Infinity. */
+  max: number;
+  tone: BandTone;
+}
+
+export interface BenchmarkSource {
+  name: string;
+  url: string;
+  note: string;
+}
+
+export interface MetricBenchmark {
+  key: MetricKey;
+  label: string;
+  unit: "%";
+  /** Short label for the funnel step the percentage applies to. */
+  appliesTo: string;
+  /** Starting value for the slider: the published platform average. */
+  defaultValue: number;
+  bands: Band[];
+  typicalRange: string;
+  sources: BenchmarkSource[];
+  slider: { min: number; max: number; step: number };
+  /**
+   * Show the soft "above the best published results" warning when the value is above this.
+   * Left undefined where lower is better (bounce rate).
+   */
+  warnAbove?: number;
+  /** Tooltip copy for the input label. */
+  help: string;
+}
+
+export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
+  bounceRate: {
+    key: "bounceRate",
+    label: "Bounce rate",
+    unit: "%",
+    appliesTo: "of emails sent",
+    defaultValue: 1.5,
+    bands: [
+      { label: "Healthy", min: 0, max: 2, tone: "good" },
+      { label: "Watch", min: 2, max: 4, tone: "warn" },
+      { label: "Too high", min: 4, max: Infinity, tone: "bad" },
+    ],
+    typicalRange: "Keep under 2%. Typical sender is 1.54%. Above 4% hurts sender reputation",
+    sources: [
+      {
+        name: "Smartlead",
+        url: "https://www.smartlead.ai/blog/cold-email-bounce-rate",
+        note: "Cold email bounce rate guidance",
+      },
+      {
+        name: "Modern Inbound",
+        url: "https://moderninbound.com/blog/cold-email-bounce-rate-benchmarks-2026",
+        note: "Cold email bounce rate benchmarks, 2026",
+      },
+    ],
+    slider: { min: 0, max: 10, step: 0.1 },
+    help: "Share of emails that never arrive because the address is invalid or the mailbox is full. Emails delivered = emails sent x (1 - bounce rate).",
+  },
+  replyRate: {
+    key: "replyRate",
+    label: "Reply rate",
+    unit: "%",
+    appliesTo: "of delivered emails",
+    defaultValue: 3.4,
+    bands: [
+      { label: "Below average", min: 0, max: 2, tone: "warn" },
+      { label: "Average", min: 2, max: 3.5, tone: "average" },
+      { label: "Above average", min: 3.5, max: 5.5, tone: "good" },
+      { label: "Top quartile", min: 5.5, max: 10, tone: "great" },
+      { label: "Elite", min: 10, max: Infinity, tone: "great" },
+    ],
+    typicalRange: "2 to 3.5% average, 5.5% top quartile, 10%+ elite",
+    sources: [
+      {
+        name: "Instantly 2026 benchmark report",
+        url: "https://emailbison.com/blogs/cold-email-open-rates",
+        note: "Average 3.43%, top quartile 5.5%, elite 10%+",
+      },
+      {
+        name: "Saleshandy, 53M emails",
+        url: "https://www.saleshandy.com/blog/cold-email-statistics/",
+        note: "Average 3.7%",
+      },
+      {
+        name: "Puzzle Inbox",
+        url: "https://puzzleinbox.com/blog/cold-email-reply-rate-benchmarks-2026-by-segment",
+        note: "Average 2 to 3%, top 10% 4 to 6%",
+      },
+      {
+        name: "Smartlead, 850M emails",
+        url: "https://www.smartlead.ai/benchmarks",
+        note: "Typical sender 0.74%, top 10% 2.63%",
+      },
+    ],
+    slider: { min: 0, max: 15, step: 0.1 },
+    warnAbove: 10,
+    help: "Share of delivered emails that get any reply, including not interested and out of office style replies.",
+  },
+  positiveShare: {
+    key: "positiveShare",
+    label: "Positive reply share",
+    unit: "%",
+    appliesTo: "of replies",
+    defaultValue: 40,
+    bands: [
+      { label: "Low", min: 0, max: 30, tone: "warn" },
+      { label: "Average", min: 30, max: 50, tone: "average" },
+      { label: "Strong", min: 50, max: Infinity, tone: "great" },
+    ],
+    typicalRange: "30 to 50% of replies are positive",
+    sources: [
+      {
+        name: "Saleshandy via EmailBison",
+        url: "https://emailbison.com/blogs/cold-email-open-rates",
+        note: "30 to 50% of replies are positive",
+      },
+      {
+        name: "Cleverly",
+        url: "https://www.cleverly.co/blog/cold-email-benchmarks-by-industry",
+        note: "40 to 60%",
+      },
+    ],
+    slider: { min: 0, max: 100, step: 1 },
+    // Upper end of the Cleverly range. Not a published "elite" level.
+    warnAbove: 60,
+    help: "Share of replies that show real interest. The rest is negative or not interested, and is calculated for you.",
+  },
+  bookingRate: {
+    key: "bookingRate",
+    label: "Meeting booking rate",
+    unit: "%",
+    appliesTo: "of positive replies",
+    defaultValue: 40,
+    bands: [
+      { label: "Low", min: 0, max: 30, tone: "warn" },
+      { label: "Average", min: 30, max: 50, tone: "average" },
+      { label: "Strong", min: 50, max: Infinity, tone: "great" },
+    ],
+    typicalRange: "20 to 50% of positive replies become meetings",
+    sources: [
+      {
+        name: "JoinSync",
+        url: "https://joinsync.substack.com/p/why-most-cold-outreach-fails",
+        note: "20 to 50%",
+      },
+      {
+        name: "Cleverly",
+        url: "https://www.cleverly.co/blog/cold-email-benchmarks-by-industry",
+        note: "30 to 60%",
+      },
+    ],
+    slider: { min: 0, max: 100, step: 1 },
+    // Upper end of the Cleverly range. Not a published "elite" level.
+    warnAbove: 60,
+    help: "Share of positive replies that end up as a booked meeting on the calendar.",
+  },
+  showRate: {
+    key: "showRate",
+    label: "Meeting show-up rate",
+    unit: "%",
+    appliesTo: "of booked meetings",
+    defaultValue: 75,
+    bands: [
+      { label: "Low", min: 0, max: 70, tone: "warn" },
+      { label: "Average", min: 70, max: 85, tone: "average" },
+      { label: "Strong", min: 85, max: Infinity, tone: "great" },
+    ],
+    typicalRange: "About 80%, top teams 85%+",
+    sources: [
+      {
+        name: "Leadhaste",
+        url: "https://www.leadhaste.com/blog/outbound-sales-benchmarks-2026",
+        note: "About 80%",
+      },
+      {
+        name: "EngageTech, cited by Prospeo",
+        url: "https://prospeo.io/s/outbound-sales-conversion-rates",
+        note: "67% hold rate",
+      },
+    ],
+    slider: { min: 0, max: 100, step: 1 },
+    // Well above the "top teams 85%+" line. Not a published "elite" level.
+    warnAbove: 90,
+    help: "Share of booked meetings that actually happen. No-shows and cancellations are the rest.",
+  },
+  closeRate: {
+    key: "closeRate",
+    label: "Close rate",
+    unit: "%",
+    appliesTo: "of held first meetings",
+    defaultValue: 12,
+    bands: [
+      { label: "Low", min: 0, max: 10, tone: "warn" },
+      { label: "Average", min: 10, max: 20, tone: "average" },
+      { label: "Strong", min: 20, max: Infinity, tone: "great" },
+    ],
+    typicalRange:
+      "Qualified opportunities close at about 21% on average. First meetings from cold outreach close lower, often 8 to 15%",
+    sources: [
+      {
+        name: "Prospeo",
+        url: "https://prospeo.io/s/average-sales-close-rate",
+        note: "About 21% B2B average",
+      },
+      {
+        name: "First Page Sage via SerpSculpt",
+        url: "https://serpsculpt.com/b2b-saas-demo-to-close-rate-benchmark/",
+        note: "12% B2B SaaS, SQL to closed won",
+      },
+      {
+        name: "Landbase via SerpSculpt",
+        url: "https://serpsculpt.com/b2b-saas-demo-to-close-rate-benchmark/",
+        note: "Win rate by deal size: under $50K 25 to 35%, over $250K 12 to 22%",
+      },
+    ],
+    slider: { min: 0, max: 100, step: 1 },
+    // Top of the published win rate by deal size (small deals). Not a published "elite" level.
+    warnAbove: 35,
+    help: "Share of held first meetings that turn into a paying customer. Used exactly as entered.",
+  },
+};
+
+/** Order the rate sliders appear in the funnel. */
+export const RATE_ORDER: MetricKey[] = [
+  "bounceRate",
+  "replyRate",
+  "positiveShare",
+  "bookingRate",
+  "showRate",
+  "closeRate",
+];
+
+export const SOFT_WARNING_COPY =
+  "This is above the best published results. Double check before you plan around it.";
+
+/* ------------------------------------------------------------------ */
+/* Input options and defaults                                          */
+/* ------------------------------------------------------------------ */
+
+export interface Currency {
+  code: string;
+  symbol: string;
+  label: string;
+  /** Locale used for number grouping. INR uses en-IN. */
+  locale: string;
+}
+
+export const CURRENCIES: Currency[] = [
+  { code: "USD", symbol: "$", label: "USD - United States Dollar", locale: "en-US" },
+  { code: "INR", symbol: "₹", label: "INR - Indian Rupee", locale: "en-IN" },
+  { code: "AUD", symbol: "A$", label: "AUD - Australian Dollar", locale: "en-US" },
+  { code: "AED", symbol: "د.إ", label: "AED - UAE Dirham", locale: "en-US" },
+  { code: "SGD", symbol: "S$", label: "SGD - Singapore Dollar", locale: "en-US" },
+  { code: "HKD", symbol: "HK$", label: "HKD - Hong Kong Dollar", locale: "en-US" },
+  { code: "CNY", symbol: "¥", label: "CNY - Chinese Yuan", locale: "en-US" },
+  { code: "JPY", symbol: "¥", label: "JPY - Japanese Yen", locale: "en-US" },
+  { code: "CAD", symbol: "C$", label: "CAD - Canadian Dollar", locale: "en-US" },
+];
+
+export const DURATION_OPTIONS: { months: number; label: string }[] = [
+  { months: 1, label: "1 Month" },
+  { months: 3, label: "3 Months" },
+  { months: 6, label: "6 Months" },
+  { months: 12, label: "12 Months" },
+];
+
+export interface CalculatorState {
+  currency: string;
+  industry: string | null;
+  monthlyEmails: number;
+  durationMonths: number;
+  bounceRate: number;
+  replyRate: number;
+  positiveShare: number;
+  bookingRate: number;
+  showRate: number;
+  closeRate: number;
+  /** null means the visitor has not entered a value yet. */
+  dealValue: number | null;
+  invoicesPerYear: number;
+  retentionMonths: number;
+  monthlyInvestment: number | null;
+  warmup: boolean;
+  salesCycleLagMonths: number;
+}
+
+export const DEFAULT_STATE: CalculatorState = {
+  currency: "USD",
+  industry: null,
+  monthlyEmails: 5000,
+  durationMonths: 12,
+  bounceRate: BENCHMARKS.bounceRate.defaultValue,
+  replyRate: BENCHMARKS.replyRate.defaultValue,
+  positiveShare: BENCHMARKS.positiveShare.defaultValue,
+  bookingRate: BENCHMARKS.bookingRate.defaultValue,
+  showRate: BENCHMARKS.showRate.defaultValue,
+  closeRate: BENCHMARKS.closeRate.defaultValue,
+  dealValue: null,
+  invoicesPerYear: 1,
+  retentionMonths: 12,
+  monthlyInvestment: null,
+  warmup: true,
+  salesCycleLagMonths: 0,
+};
+
+/* ------------------------------------------------------------------ */
+/* Model constants                                                     */
+/* ------------------------------------------------------------------ */
+
+export const MODEL = {
+  /** Share of normal volume sent in month one while new mailboxes warm up. */
+  warmupFirstMonthFactor: 0.5,
+  warmupWeeks: 2,
+  /** Highest sales cycle lag the input accepts. */
+  maxSalesCycleLagMonths: 12,
+} as const;
+
+/** Deliverability SOP used for the sending capacity card. */
+export const SENDING_SOP = {
+  emailsPerMailboxPerDay: 25,
+  mailboxesPerDomain: 4,
+  sendingDaysPerMonth: 22,
+  warmupWeeks: 2,
+} as const;
+
+/* ------------------------------------------------------------------ */
+/* Derived checks and reference lines                                  */
+/* ------------------------------------------------------------------ */
+
+export const MEETINGS_PER_1000_REFERENCE = {
+  text: "Well run campaigns land 4 to 10 meetings per 1,000 emails (Modern Inbound). Enterprise 3 to 8, mid market 5 to 15, SMB 10 to 25 (Cleverly).",
+  source: {
+    name: "Modern Inbound",
+    url: "https://moderninbound.com/blog/cold-email-conversion-rate-benchmarks",
+    note: "Cold email conversion rate benchmarks",
+  },
+};
+
+export const POSITIVE_REPLY_RATE_REFERENCE = {
+  formulaLabel: "Positive reply rate = reply rate x share",
+  context: "Average 0.5 to 1.0%, top 10% 1.5 to 3.0% (Puzzle Inbox).",
+  source: {
+    name: "Puzzle Inbox",
+    url: "https://puzzleinbox.com/blog/cold-email-reply-rate-benchmarks-2026-by-segment",
+    note: "Cold email reply rate benchmarks by segment, 2026",
+  },
+};
+
+export const COST_REFERENCE = {
+  text: "Well run programs cost about $100 to $300 per qualified meeting (Prospeo). Top cost per meeting seen is about $152 (Instantly).",
+  sources: [
+    { name: "Prospeo", url: "https://prospeo.io/s/email-outreach-qa", note: "Cost per qualified meeting" },
+    {
+      name: "Instantly",
+      url: "https://instantly.ai/blog/email-sequence-benchmarks-2026-whats-a-good-open-rate-reply-rate-and-cost-per-meeting/",
+      note: "Cost per meeting, 2026 benchmarks",
+    },
+  ] as BenchmarkSource[],
+};
+
+/* ------------------------------------------------------------------ */
+/* Industry table                                                      */
+/* ------------------------------------------------------------------ */
+
+export interface IndustryRow {
+  key: string;
+  label: string;
+  replyMin: number;
+  replyMax: number;
+  /** Display text, null when the source gives no figure. */
+  positiveReplyRange: string | null;
+}
+
+export const INDUSTRIES: IndustryRow[] = [
+  { key: "saas", label: "B2B SaaS / Software", replyMin: 2, replyMax: 4, positiveReplyRange: "1-2%" },
+  { key: "services", label: "B2B Services and Agencies", replyMin: 2, replyMax: 6, positiveReplyRange: "0.8-1.5%" },
+  { key: "it", label: "IT Services and MSPs", replyMin: 3, replyMax: 4, positiveReplyRange: null },
+  { key: "manufacturing", label: "Manufacturing and Industrial", replyMin: 1.5, replyMax: 5, positiveReplyRange: "0.5-1.0%" },
+  { key: "healthcare", label: "Healthcare and MedTech", replyMin: 1.5, replyMax: 6, positiveReplyRange: "0.5-1.0%" },
+  { key: "finance", label: "Financial Services", replyMin: 2, replyMax: 4, positiveReplyRange: "0.7-1.2%" },
+  { key: "education", label: "Education / EdTech", replyMin: 1.5, replyMax: 7, positiveReplyRange: "0.5-1.0%" },
+  { key: "ecommerce", label: "E-commerce / DTC / Consumer", replyMin: 1, replyMax: 4, positiveReplyRange: "0.8-1.5%" },
+  { key: "realestate", label: "Real Estate", replyMin: 1.5, replyMax: 7, positiveReplyRange: "0.5-1.0%" },
+  { key: "legal", label: "Legal", replyMin: 8, replyMax: 10, positiveReplyRange: null },
+  { key: "government", label: "Government / Public sector", replyMin: 1, replyMax: 2, positiveReplyRange: "0.3-0.7%" },
+];
+
+export const INDUSTRY_NOTE =
+  "Ranges across published 2026 sources. Your results depend on list quality, offer and deliverability.";
+
+export const INDUSTRY_SOURCES: BenchmarkSource[] = [
+  {
+    name: "Puzzle Inbox",
+    url: "https://puzzleinbox.com/blog/cold-email-reply-rate-benchmarks-2026-by-segment",
+    note: "Reply and positive reply rates by segment",
+  },
+  {
+    name: "Cleverly",
+    url: "https://www.cleverly.co/blog/cold-email-benchmarks-by-industry",
+    note: "Cold email benchmarks by industry",
+  },
+];
+
+export const FOOTNOTE =
+  "Benchmarks compiled from Instantly, Saleshandy, Smartlead, Woodpecker, Puzzle Inbox, Cleverly and others, 2026. Results vary. This is an estimate, not a guarantee.";
