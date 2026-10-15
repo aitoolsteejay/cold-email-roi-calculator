@@ -80,9 +80,9 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
 
         <div className="min-w-0 space-y-6 lg:col-span-8">
           <div ref={resultsRef} className="space-y-6" aria-live="off">
+            <ConversionFunnel result={result} currency={currency} />
             <HighlightCards result={result} currency={currency} hasDealValue={hasDealValue} hasInvestment={hasInvestment} durationMonths={state.durationMonths} />
             <StatRow result={result} currency={currency} hasInvestment={hasInvestment} />
-            <ConversionFunnel result={result} currency={currency} />
             <GrowthChart result={result} currency={currency} hasInvestment={hasInvestment} />
           </div>
           <IndustryBenchmarks />
