@@ -24,7 +24,8 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
     { label: "Delivered", value: result.delivered },
     { label: "Replies", value: result.replies },
     { label: "Positive replies", value: result.positive },
-    { label: "Meetings booked", value: result.booked },
+    // Meetings are whole events, so they show as whole numbers.
+    { label: "Meetings booked", value: result.booked, whole: true },
     { label: "Meetings held", value: result.held },
     { label: "Deals closed", value: result.deals },
   ];
@@ -53,7 +54,7 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
               <div className="mb-1 flex items-center justify-between px-1">
                 <span className="text-sm font-semibold text-foreground">{s.label}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-base font-bold text-accent">{formatCount(s.value, loc)}</span>
+                  <span className="text-base font-bold text-accent">{"whole" in s && s.whole ? formatInteger(s.value, loc) : formatCount(s.value, loc)}</span>
                   {step !== null && <span className="text-xs text-muted-foreground">({formatPercent(step, loc)})</span>}
                 </span>
               </div>

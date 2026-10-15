@@ -2,7 +2,7 @@ import { CalendarCheck, CalendarDays, Gauge, Handshake, Receipt, Timer, Wallet }
 import { Card } from "@/components/ui/card";
 import { MEETINGS_PER_1000_REFERENCE, type Currency } from "@/data/coldEmailBenchmarks";
 import type { RoiResult } from "@/lib/coldEmailRoi";
-import { formatCount, formatMoney } from "@/lib/format";
+import { formatCount, formatInteger, formatMoney } from "@/lib/format";
 import { InfoTip } from "./InfoTip";
 import { Lines } from "./Lines";
 import { SourcesPopover } from "./SourcesPopover";
@@ -49,7 +49,7 @@ export function StatRow({ result, currency, hasInvestment }: Props) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-        <Stat icon={CalendarDays} color="#7C3AED" label="Meetings booked" value={formatCount(result.booked, loc)} help="Positive replies x meeting booking rate." />
+        <Stat icon={CalendarDays} color="#7C3AED" label="Meetings booked" value={formatInteger(result.booked, loc)} help="Positive replies x meeting booking rate." />
         <Stat icon={CalendarCheck} color="#3B82F6" label="Meetings held" value={formatCount(result.held, loc)} help="Booked meetings x show-up rate." />
         <Stat icon={Handshake} color="#10B981" label="Deals closed" value={formatCount(result.deals, loc)} help="Held meetings x close rate." />
         <Stat

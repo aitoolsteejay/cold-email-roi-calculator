@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { BENCHMARKS, MYNTMORE_2026, SOFT_WARNING_COPY, type MetricKey } from "@/data/coldEmailBenchmarks";
 import { bandFor, isAboveBestPublished } from "@/lib/coldEmailRoi";
-import { formatCount, formatPercent } from "@/lib/format";
+import { formatCount, formatInteger, formatPercent } from "@/lib/format";
 import { BandChip } from "./BandChip";
 import { InfoTip } from "./InfoTip";
 import { Lines } from "./Lines";
@@ -16,11 +16,14 @@ interface RateSliderProps {
   /** Count at the funnel stage this rate produces, shown as "= 2,009". */
   count: number;
   countNoun: string;
+  /** Show the count as a whole number (meetings cannot be fractional). */
+  wholeCount?: boolean;
   locale: string;
   children?: React.ReactNode;
 }
 
-export function RateSlider({ metric, value, onChange, count, countNoun, locale, children }: RateSliderProps) {
+export function RateSlider({ metric, value, onChange, count, countNoun, wholeCount, locale, children }: RateSliderProps) {
+  const countText = wholeCount ? formatInteger(count, locale) : formatCount(count, locale);
   const b = BENCHMARKS[metric];
   const band = bandFor(metric, value);
   const warn = isAboveBestPublished(metric, value);
@@ -43,7 +46,7 @@ export function RateSlider({ metric, value, onChange, count, countNoun, locale, 
           <span className="flex items-baseline gap-1.5" aria-live="polite">
             <span className="text-sm font-bold text-accent">{formatPercent(value, locale)}</span>
             <span className="text-xs text-muted-foreground">
-              = {formatCount(count, locale)}
+              = {countText}
               <span className="sr-only"> {countNoun}</span>
             </span>
           </span>
@@ -57,7 +60,7 @@ export function RateSlider({ metric, value, onChange, count, countNoun, locale, 
         onValueChange={([v]) => onChange(v)}
         thumbLabelledBy={labelId}
         thumbDescribedBy={captionId}
-        valueText={`${formatPercent(value, locale)}, ${formatCount(count, locale)} ${countNoun}`}
+        valueText={`${formatPercent(value, locale)}, ${countText} ${countNoun}`}
       />
       <div id={captionId} className="space-y-1 text-[11px] leading-snug text-muted-foreground">
         {b.myntmore && (

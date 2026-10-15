@@ -98,7 +98,7 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
             </div>
           </div>
 
-          <RateSlider metric="bookingRate" value={state.bookingRate} onChange={(v) => setRate("bookingRate", v)} count={counts.bookingRate} countNoun="meetings booked" locale={locale} />
+          <RateSlider metric="bookingRate" value={state.bookingRate} onChange={(v) => setRate("bookingRate", v)} count={counts.bookingRate} countNoun="meetings booked" wholeCount locale={locale} />
           <RateSlider metric="showRate" value={state.showRate} onChange={(v) => setRate("showRate", v)} count={counts.showRate} countNoun="meetings held" locale={locale} />
           <RateSlider metric="closeRate" value={state.closeRate} onChange={(v) => setRate("closeRate", v)} count={counts.closeRate} countNoun="deals closed" locale={locale} />
         </div>

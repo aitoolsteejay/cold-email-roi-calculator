@@ -112,7 +112,7 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
                   <div className="flex items-baseline justify-between gap-2">
                     <dt className="text-muted-foreground">Meetings booked</dt>
                     <dd className="font-bold" style={{ color: "#B8860B" }}>
-                      {formatCount(meetings, locale)}
+                      {n(meetings)}
                     </dd>
                   </div>
                 </dl>
@@ -140,7 +140,7 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
           <div className="flex flex-col-reverse">
             <dt className="text-xs text-muted-foreground">meetings booked</dt>
             <dd className="text-lg font-black sm:text-xl" style={{ color: "#B8860B" }}>
-              {formatCount(durationPlan.totalProspects * bookedPerProspect, locale)}
+              {n(durationPlan.totalProspects * bookedPerProspect)}
             </dd>
           </div>
         </dl>
