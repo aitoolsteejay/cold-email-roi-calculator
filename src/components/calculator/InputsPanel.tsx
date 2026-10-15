@@ -32,7 +32,7 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
   const positiveReplyRate = (state.replyRate * state.positiveShare) / 100;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain [scrollbar-width:thin]">
+    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <div className="mb-6 flex items-center justify-between gap-2">
         <h2 className="text-2xl font-black text-foreground">Your Inputs</h2>
         <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground">

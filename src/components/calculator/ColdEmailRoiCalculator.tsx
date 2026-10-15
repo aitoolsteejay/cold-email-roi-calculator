@@ -80,11 +80,9 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
           <div ref={resultsRef} className="space-y-6" aria-live="off">
             <HighlightCards result={result} currency={currency} hasDealValue={hasDealValue} hasInvestment={hasInvestment} durationMonths={state.durationMonths} />
             <StatRow result={result} currency={currency} hasInvestment={hasInvestment} />
+            <ConversionFunnel result={result} currency={currency} />
+            <GrowthChart result={result} currency={currency} hasInvestment={hasInvestment} />
             <SendingRampCard rampPlan={rampPlan} durationPlan={result.plan} durationMonths={state.durationMonths} locale={currency.locale} />
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <ConversionFunnel result={result} currency={currency} />
-              <GrowthChart result={result} currency={currency} hasInvestment={hasInvestment} />
-            </div>
           </div>
           <IndustryBenchmarks selected={state.industry} />
           <p className="text-xs leading-relaxed text-muted-foreground">{FOOTNOTE}</p>

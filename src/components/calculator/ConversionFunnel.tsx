@@ -30,12 +30,12 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
 
   return (
     <Card className="p-5 sm:p-6">
-      <h3 className="mb-1 text-center text-xl font-bold text-foreground">Conversion Funnel</h3>
-      <p className="mb-6 text-center text-xs text-muted-foreground">
+      <h3 className="mb-1 text-center text-2xl font-black text-foreground">Conversion Funnel</h3>
+      <p className="mx-auto mb-8 max-w-xl text-center text-sm text-muted-foreground">
         {formatInteger(result.sent, loc)} emails to {formatInteger(result.prospects, loc)} prospects. Bars show share of prospects reached.
         Brackets show conversion from the step above.
       </p>
-      <ol className="mx-auto w-full max-w-md space-y-1.5">
+      <ol className="mx-auto w-full max-w-2xl space-y-2">
         {stages.map((s, i) => {
           const prev = i === 0 ? null : stages[i - 1].value;
           const step = prev && prev > 0 ? (s.value / prev) * 100 : null;
@@ -43,16 +43,16 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
           return (
             <li key={s.label}>
               <div className="mb-1 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-foreground">{s.label}</span>
+                <span className="text-sm font-semibold text-foreground">{s.label}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-accent">{formatCount(s.value, loc)}</span>
+                  <span className="text-base font-bold text-accent">{formatCount(s.value, loc)}</span>
                   {step !== null && <span className="text-xs text-muted-foreground">({formatPercent(step, loc)})</span>}
                 </span>
               </div>
               <div className="flex justify-center">
                 <div
                   data-pdf-flat
-                  className="relative flex h-11 items-center justify-center rounded-2xl transition-all duration-500 ease-out"
+                  className="relative flex h-12 items-center justify-center rounded-2xl transition-all duration-500 ease-out sm:h-14"
                   style={{ ...BAR_STYLE, width: `${barWidth(s.value, result.prospects)}%` }}
                 >
                   <span className="text-sm font-bold text-gray-900">{formatPercent(ofSent, loc)}</span>
@@ -62,16 +62,16 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
           );
         })}
       </ol>
-      <dl className="mx-auto mt-5 grid max-w-md grid-cols-2 gap-3 border-t border-border pt-4">
+      <dl className="mx-auto mt-6 grid max-w-2xl grid-cols-2 gap-3 border-t border-border pt-5">
         <div className="rounded-lg bg-secondary/40 p-3 text-center">
           <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Revenue</dt>
-          <dd className="text-lg font-black" style={{ color: "#B8860B" }}>
+          <dd className="text-2xl font-black" style={{ color: "#B8860B" }}>
             {formatMoney(result.revenue, currency)}
           </dd>
         </div>
         <div className="rounded-lg bg-secondary/40 p-3 text-center">
           <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">ROI</dt>
-          <dd className="text-lg font-black" style={{ color: "#3B82F6" }}>
+          <dd className="text-2xl font-black" style={{ color: "#3B82F6" }}>
             {result.roiPercent === null ? "N/A" : formatPercent(result.roiPercent, loc)}
           </dd>
         </div>
