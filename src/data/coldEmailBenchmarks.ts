@@ -44,6 +44,8 @@ export interface MetricBenchmark {
   bands: Band[];
   /** Published benchmark, one short line per fact. */
   typicalRange: string[];
+  /** The benchmark in a few words, for the one-line caption under the slider. */
+  shortRange: string;
   sources: BenchmarkSource[];
   slider: { min: number; max: number; step: number };
   /**
@@ -69,6 +71,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Too high", min: 4, max: Infinity, tone: "bad" },
     ],
     typicalRange: ["Keep under 2%", "Typical sender: 1.54%", "Above 4% hurts sender reputation"],
+    shortRange: "under 2%",
     sources: [
       {
         name: "Smartlead",
@@ -102,6 +105,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Elite", min: 10, max: Infinity, tone: "great" },
     ],
     typicalRange: ["Average: 2 to 3.5%", "Top quartile: 5.5%", "Elite: 10%+"],
+    shortRange: "2 to 3.5%",
     sources: [
       {
         name: "Instantly 2026 benchmark report",
@@ -141,6 +145,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Strong", min: 50, max: Infinity, tone: "great" },
     ],
     typicalRange: ["30 to 50% of replies are positive"],
+    shortRange: "30 to 50%",
     sources: [
       {
         name: "Saleshandy via EmailBison",
@@ -171,6 +176,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Strong", min: 50, max: Infinity, tone: "great" },
     ],
     typicalRange: ["20 to 50% of positive replies become meetings"],
+    shortRange: "20 to 50%",
     sources: [
       {
         name: "JoinSync",
@@ -200,6 +206,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Strong", min: 85, max: Infinity, tone: "great" },
     ],
     typicalRange: ["About 80%", "Top teams: 85%+"],
+    shortRange: "about 80%",
     sources: [
       {
         name: "Leadhaste",
@@ -229,6 +236,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Strong", min: 20, max: Infinity, tone: "great" },
     ],
     typicalRange: ["Qualified opportunities: about 21%", "First meetings from cold outreach: 8 to 15%"],
+    shortRange: "8 to 21%",
     sources: [
       {
         name: "Prospeo",

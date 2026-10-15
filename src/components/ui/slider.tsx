@@ -8,7 +8,7 @@ export const Slider = React.forwardRef<
 >(({ className, thumbLabel, thumbLabelledBy, thumbDescribedBy, valueText, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
-    className={cn("relative flex w-full touch-none select-none items-center cursor-pointer py-2", className)}
+    className={cn("relative flex w-full touch-none select-none items-center cursor-pointer py-1.5", className)}
     {...props}
   >
     <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-secondary">
@@ -20,7 +20,7 @@ export const Slider = React.forwardRef<
       aria-labelledby={thumbLabelledBy}
       aria-describedby={thumbDescribedBy}
       aria-valuetext={valueText}
-      className="relative block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 before:absolute before:-inset-3 before:content-['']"
+      className="relative z-10 block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 before:absolute before:-inset-3 before:content-['']"
     />
   </SliderPrimitive.Root>
 ));

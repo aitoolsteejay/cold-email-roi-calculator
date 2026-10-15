@@ -17,6 +17,8 @@ interface NumberFieldProps {
   max?: number;
   hint?: React.ReactNode;
   labelClassName?: string;
+  /** Replaces the plain info tooltip, e.g. with a details card that has links. */
+  info?: React.ReactNode;
 }
 
 function display(value: number | null, locale: string) {
@@ -37,6 +39,7 @@ export function NumberField({
   max,
   hint,
   labelClassName,
+  info,
 }: NumberFieldProps) {
   const [text, setText] = useState(display(value, locale));
   const [focused, setFocused] = useState(false);
@@ -49,12 +52,12 @@ export function NumberField({
   const hintId = hint ? `${id}-hint` : undefined;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5">
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
         <Label htmlFor={id} className={labelClassName}>
           {label}
         </Label>
-        <InfoTip label={label}>{help}</InfoTip>
+        {info ?? <InfoTip label={label}>{help}</InfoTip>}
       </div>
       <div className="relative">
         {prefix && (
