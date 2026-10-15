@@ -69,6 +69,7 @@ For 1,000 emails a day (7,500 prospects a month) that is 10 domains and 40 ids. 
 The repo is ready to import into Vercel as is. `vercel.json` sets the Vite framework, `npm ci`, `npm run build` and the `dist` output, so no dashboard settings are needed.
 
 - `/` redirects to `/tools/cold-email-roi-calculator`.
-- Every other path falls back to `index.html` so client-side routes load. Hashed files in `/assets` are cached for a year.
+- Every other path falls back to `index.html` so client-side routes load.
+- No custom cache rule on `/assets`. A one-year `immutable` rule was removed because Vercel also applied it to 404s: a browser that hit a missing asset during a deploy kept the 404 and showed the page unstyled.
 - Node 20.19 or newer is required (set in `package.json` `engines`).
 - The canonical URL and Open Graph tags point to `https://www.myntmore.com/tools/cold-email-roi-calculator`. Change `SITE_URL` in `src/pages/seo.ts` if this deployment should be the canonical page.

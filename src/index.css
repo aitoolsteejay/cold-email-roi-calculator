@@ -29,5 +29,7 @@
   * { @apply border-border; }
   html { scroll-behavior: smooth; }
   body { @apply bg-cream text-foreground font-sans antialiased; }
+  /* No grey flash when tapping buttons and links on phones; focus rings still show for keyboard users. */
+  button, a { -webkit-tap-highlight-color: transparent; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 }
