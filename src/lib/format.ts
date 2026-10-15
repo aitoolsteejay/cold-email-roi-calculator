@@ -30,12 +30,17 @@ export function formatInteger(value: number | null | undefined, locale = "en-US"
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(finite(value));
 }
 
-/** Percent with sensible precision: 1,057%, 3.4%, 0.05%. */
-export function formatPercent(value: number | null | undefined, locale = "en-US"): string {
+/** Percent with sensible precision: 1,057%, 3.4%, 0.05%. Pass minDigits to keep, say, 1.67% from showing as 1.7%. */
+export function formatPercent(value: number | null | undefined, locale = "en-US", minDigits = 0): string {
   const v = finite(value);
   const abs = Math.abs(v);
-  const digits = abs >= 100 ? 0 : abs >= 1 ? 1 : abs >= 0.1 ? 2 : 3;
+  const digits = Math.max(minDigits, abs >= 100 ? 0 : abs >= 1 ? 1 : abs >= 0.1 ? 2 : 3);
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(v)}%`;
+}
+
+/** Decimal places a slider step needs: 1 -> 0, 0.1 -> 1, 0.01 -> 2. */
+export function decimalsForStep(step: number): number {
+  return step > 0 && step < 1 ? Math.round(-Math.log10(step)) : 0;
 }
 
 /** Parse what a visitor typed. Accepts commas and spaces. Returns null for empty or invalid. */

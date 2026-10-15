@@ -43,7 +43,7 @@ The sliders start at Myntmore's own 2026 Smartlead averages (pulled 15 October 2
 
 | Rate | Default | From |
 |---|---|---|
-| Bounce | 3.7% | 456 bounces / 12,453 prospects, all 17 campaigns of 2026 |
+| Bounce | 1.67% | Myntmore's 2026 average bounce rate |
 | Reply | 3.8% | 256 replies / 6,657 delivered prospects, 10 completed campaigns (auto replies left out) |
 | Positive share | 59% | 151 positive / 256 replies |
 | Meeting booking | 47% | 71 meeting requests / 151 positive replies |

@@ -61,8 +61,8 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
     label: "Bounce rate",
     unit: "%",
     appliesTo: "of prospects",
-    defaultValue: 3.7,
-    myntmore: { value: 3.7, detail: ["456 bounces from 12,453 prospects", "All 17 campaigns of 2026"] },
+    defaultValue: 1.67,
+    myntmore: { value: 1.67, detail: ["Myntmore's 2026 average bounce rate"] },
     bands: [
       { label: "Healthy", min: 0, max: 2, tone: "good" },
       { label: "Watch", min: 2, max: 4, tone: "warn" },
@@ -81,7 +81,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
         note: "Cold email bounce rate benchmarks, 2026",
       },
     ],
-    slider: { min: 0, max: 10, step: 0.1 },
+    slider: { min: 0, max: 10, step: 0.01 },
     help: "Share of prospects whose address bounces because it is invalid or the mailbox is full. Prospects delivered = prospects reached x (1 - bounce rate).",
   },
   replyRate: {

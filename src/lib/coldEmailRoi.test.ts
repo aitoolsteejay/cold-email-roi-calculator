@@ -166,8 +166,8 @@ describe("calculateRoi", () => {
 });
 
 describe("helpers", () => {
-  it("Myntmore 2026 defaults reproduce the Smartlead meeting request rate", () => {
-    // Smartlead 2026: 71 meeting requests from 6,983 prospects in completed campaigns = 10.2 per 1,000.
-    expect(meetingsPer1000Prospects(DEFAULT_STATE)).toBeCloseTo(10.15, 1);
+  it("Myntmore 2026 defaults land close to the Smartlead meeting request rate", () => {
+    // (1 - 1.67%) x 3.8% x 59% x 47% = 10.36 per 1,000. Smartlead 2026 shows 10.2 meeting requests per 1,000 prospects.
+    expect(meetingsPer1000Prospects(DEFAULT_STATE)).toBeCloseTo(10.36, 1);
   });
 });

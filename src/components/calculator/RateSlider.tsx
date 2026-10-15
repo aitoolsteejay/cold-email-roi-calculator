@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { BENCHMARKS, MYNTMORE_2026, SOFT_WARNING_COPY, type MetricKey } from "@/data/coldEmailBenchmarks";
 import { bandFor, isAboveBestPublished } from "@/lib/coldEmailRoi";
-import { formatCount, formatInteger, formatPercent } from "@/lib/format";
+import { decimalsForStep, formatCount, formatInteger, formatPercent } from "@/lib/format";
 import { BandChip } from "./BandChip";
 import { InfoTip } from "./InfoTip";
 import { Lines } from "./Lines";
@@ -24,6 +24,8 @@ interface RateSliderProps {
 
 export function RateSlider({ metric, value, onChange, count, countNoun, wholeCount, locale, children }: RateSliderProps) {
   const countText = wholeCount ? formatInteger(count, locale) : formatCount(count, locale);
+  // Show as many decimals as the slider step allows, e.g. 1.67% for bounce rate.
+  const pct = (v: number) => formatPercent(v, locale, decimalsForStep(BENCHMARKS[metric].slider.step));
   const b = BENCHMARKS[metric];
   const band = bandFor(metric, value);
   const warn = isAboveBestPublished(metric, value);
@@ -44,7 +46,7 @@ export function RateSlider({ metric, value, onChange, count, countNoun, wholeCou
         <div className="flex items-center gap-2">
           {band && <BandChip label={band.label} tone={band.tone} />}
           <span className="flex items-baseline gap-1.5" aria-live="polite">
-            <span className="text-sm font-bold text-accent">{formatPercent(value, locale)}</span>
+            <span className="text-sm font-bold text-accent">{pct(value)}</span>
             <span className="text-xs text-muted-foreground">
               = {countText}
               <span className="sr-only"> {countNoun}</span>
@@ -60,14 +62,14 @@ export function RateSlider({ metric, value, onChange, count, countNoun, wholeCou
         onValueChange={([v]) => onChange(v)}
         thumbLabelledBy={labelId}
         thumbDescribedBy={captionId}
-        valueText={`${formatPercent(value, locale)}, ${countText} ${countNoun}`}
+        valueText={`${pct(value)}, ${countText} ${countNoun}`}
       />
       <div id={captionId} className="space-y-1 text-[11px] leading-snug text-muted-foreground">
         {b.myntmore && (
           <div className="flex items-start gap-1">
             <p>
               <span className="font-semibold text-foreground/80">Myntmore 2026 avg:</span>{" "}
-              <span className="font-bold text-foreground">{formatPercent(b.myntmore.value, locale)}</span>
+              <span className="font-bold text-foreground">{pct(b.myntmore.value)}</span>
             </p>
             <InfoTip label={`Myntmore 2026 ${b.label.toLowerCase()}`}>
               <Lines items={[...b.myntmore.detail, MYNTMORE_2026.source]} />

@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { HandUnderline, PillBadge } from "@/components/site/HandUnderline";
 import { BENCHMARKS, DURATION_OPTIONS, FOOTNOTE, RATE_ORDER } from "@/data/coldEmailBenchmarks";
 import { exportResultsPdf } from "@/lib/exportPdf";
-import { formatInteger, formatPercent, getCurrency } from "@/lib/format";
+import { decimalsForStep, formatInteger, formatPercent, getCurrency } from "@/lib/format";
 import { ConversionFunnel } from "./ConversionFunnel";
 import { GrowthChart } from "./GrowthChart";
 import { HighlightCards } from "./HighlightCards";
@@ -38,7 +38,7 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
           `Full speed: ${formatInteger(result.plan.prospectsPerMonth, currency.locale)} prospects/month, ${formatInteger(result.plan.emailsPerDay, currency.locale)} emails/day`,
           `Domains: ${formatInteger(result.plan.domains, currency.locale)}  |  Ids: ${formatInteger(result.plan.ids, currency.locale)}  |  4 emails per prospect`,
           `Duration: ${DURATION_OPTIONS.find((d) => d.months === state.durationMonths)?.label ?? `${state.durationMonths} months`}`,
-          ...RATE_ORDER.map((k) => `${BENCHMARKS[k].label}: ${formatPercent(state[k])}`),
+          ...RATE_ORDER.map((k) => `${BENCHMARKS[k].label}: ${formatPercent(state[k], "en-US", decimalsForStep(BENCHMARKS[k].slider.step))}`),
           `Average deal value: ${money(state.dealValue)}`,
           `Invoices per year: ${state.invoicesPerYear}  |  Retention: ${state.retentionMonths} months`,
           `Monthly investment: ${money(state.monthlyInvestment)}`,
