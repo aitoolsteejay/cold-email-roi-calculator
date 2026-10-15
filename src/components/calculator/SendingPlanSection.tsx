@@ -3,7 +3,6 @@ import { Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DURATION_OPTIONS, SENDING_SOP } from "@/data/coldEmailBenchmarks";
-import { bookedPerProspect } from "@/lib/coldEmailRoi";
 import { getCurrency } from "@/lib/format";
 import { InfoTip } from "./InfoTip";
 import { Lines } from "./Lines";
@@ -81,7 +80,6 @@ export const SendingPlanSection = forwardRef<HTMLDivElement, { api: CalculatorAp
             rampPlan={rampPlan}
             durationPlan={result.plan}
             durationMonths={state.durationMonths}
-            bookedPerProspect={bookedPerProspect(state)}
             locale={locale}
           />
         </div>

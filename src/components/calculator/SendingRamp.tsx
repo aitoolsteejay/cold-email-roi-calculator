@@ -47,13 +47,12 @@ interface Props {
   rampPlan: SendingPlan;
   durationPlan: SendingPlan;
   durationMonths: number;
-  bookedPerProspect: number;
   locale: string;
 }
 
-/** The ramp month by month: domains, ids added, warm-up, who is sending and what that month produces. */
+/** The ramp month by month: domains, ids added, warm-up, who is sending, and that month's prospects and emails. */
 export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRamp(
-  { rampPlan, durationPlan, durationMonths, bookedPerProspect, locale },
+  { rampPlan, durationPlan, durationMonths, locale },
   ref,
 ) {
   const n = (v: number) => formatInteger(v, locale);
@@ -72,7 +71,6 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
     <div ref={ref} className="space-y-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {cards.map(({ title, month, ongoing }) => {
-          const meetings = month.prospects * bookedPerProspect;
           return (
             <div key={title} className={cn("flex flex-col rounded-xl border p-4", ongoing ? "border-[#16a34a]/30 bg-[#16a34a]/5" : "border-border bg-secondary/20")}>
               <h4 className="mb-3 text-base font-black text-foreground">{title}</h4>
@@ -109,12 +107,6 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
                     <dt className="text-muted-foreground">Emails sent</dt>
                     <dd className="font-bold text-foreground">{n(month.sent)}</dd>
                   </div>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <dt className="text-muted-foreground">Meetings booked</dt>
-                    <dd className="font-bold" style={{ color: "#B8860B" }}>
-                      {n(meetings)}
-                    </dd>
-                  </div>
                 </dl>
               </div>
             </div>
@@ -126,22 +118,14 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Over {durationMonths} {durationMonths === 1 ? "month" : "months"}
         </p>
-        <dl className="grid grid-cols-3 gap-2 text-center">
+        <dl className="grid grid-cols-2 gap-2 text-center">
           <div className="flex flex-col-reverse">
             <dt className="text-xs text-muted-foreground">prospects</dt>
-            <dd className="text-lg font-black text-foreground sm:text-xl">
-{n(durationPlan.totalProspects)}</dd>
+            <dd className="text-lg font-black text-foreground sm:text-xl">{n(durationPlan.totalProspects)}</dd>
           </div>
           <div className="flex flex-col-reverse">
             <dt className="text-xs text-muted-foreground">emails</dt>
-            <dd className="text-lg font-black text-foreground sm:text-xl">
-{n(durationPlan.totalSent)}</dd>
-          </div>
-          <div className="flex flex-col-reverse">
-            <dt className="text-xs text-muted-foreground">meetings booked</dt>
-            <dd className="text-lg font-black sm:text-xl" style={{ color: "#B8860B" }}>
-              {n(durationPlan.totalProspects * bookedPerProspect)}
-            </dd>
+            <dd className="text-lg font-black text-foreground sm:text-xl">{n(durationPlan.totalSent)}</dd>
           </div>
         </dl>
       </div>

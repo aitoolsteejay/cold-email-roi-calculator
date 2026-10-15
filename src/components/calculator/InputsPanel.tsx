@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { COST_REFERENCE, CURRENCIES, MODEL, MYNTMORE_2026, POSITIVE_REPLY_RATE_REFERENCE } from "@/data/coldEmailBenchmarks";
 import { stageCounts } from "@/lib/coldEmailRoi";
-import { formatCount, formatMoney, formatPercent, getCurrency } from "@/lib/format";
+import { formatCount, formatInteger, formatMoney, formatPercent, getCurrency } from "@/lib/format";
 import { DetailsPopover, DetailsSection, SourceLinks } from "./DetailsPopover";
 import { InfoTip } from "./InfoTip";
 import { Lines } from "./Lines";
@@ -22,6 +22,9 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
   const locale = currency.locale;
   const counts = stageCounts(result, state.bounceRate);
   const positiveReplyRate = (state.replyRate * state.positiveShare) / 100;
+  // Rounded first, so "reached − bounced" always adds up to the delivered figure shown.
+  const reached = Math.round(result.prospects);
+  const delivered = Math.round(result.delivered);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
@@ -61,6 +64,23 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
           </div>
 
           <RateSlider metric="bounceRate" value={state.bounceRate} onChange={(v) => setRate("bounceRate", v)} count={counts.bounceRate} countNoun="prospects bounced" locale={locale} />
+
+          {/* The base for every rate below: prospects reached minus bounces. */}
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/40 px-3 py-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-semibold text-foreground">Delivered prospects</span>
+                <InfoTip label="Delivered prospects">
+                  Prospects reached minus the ones that bounced. The reply rate and every step after it are calculated on this number.
+                </InfoTip>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {formatInteger(reached, locale)} reached − {formatInteger(reached - delivered, locale)} bounced
+              </p>
+            </div>
+            <span className="shrink-0 text-base font-bold text-foreground">{formatInteger(delivered, locale)}</span>
+          </div>
+
           <RateSlider metric="replyRate" value={state.replyRate} onChange={(v) => setRate("replyRate", v)} count={counts.replyRate} countNoun="replies" locale={locale} />
           <RateSlider
             metric="positiveShare"
