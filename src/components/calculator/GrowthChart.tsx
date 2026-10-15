@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import type { Currency } from "@/data/coldEmailBenchmarks";
 import type { RoiResult } from "@/lib/coldEmailRoi";
 import { formatMoney } from "@/lib/format";
+import { Lines } from "./Lines";
 
 // Series colors copied from the live LinkedIn calculator chart.
 const SERIES = [
@@ -14,9 +15,14 @@ const SERIES = [
 export function GrowthChart({ result, currency, hasInvestment }: { result: RoiResult; currency: Currency; hasInvestment: boolean }) {
   const last = result.monthly[result.monthly.length - 1];
   const summary = last
-    ? `By month ${last.month}: revenue ${formatMoney(last.revenue, currency)}, service cost ${formatMoney(last.cost, currency)}, profit ${formatMoney(last.profit, currency)}.` +
-      (hasInvestment ? (result.paybackMonth ? ` Pays back in month ${result.paybackMonth}.` : " Does not pay back within the duration.") : "")
-    : "No months to show.";
+    ? [
+        `By month ${last.month}:`,
+        `Revenue ${formatMoney(last.revenue, currency)}`,
+        `Service cost ${formatMoney(last.cost, currency)}`,
+        `Profit ${formatMoney(last.profit, currency)}`,
+        ...(hasInvestment ? [result.paybackMonth ? `Pays back in month ${result.paybackMonth}` : "Does not pay back within the duration"] : []),
+      ]
+    : ["No months to show."];
 
   return (
     <Card className="p-5 sm:p-6">
@@ -47,7 +53,7 @@ export function GrowthChart({ result, currency, hasInvestment }: { result: RoiRe
           </ResponsiveContainer>
         </div>
         <figcaption id="growth-chart-summary" className="mt-3 text-xs text-muted-foreground">
-          {summary}
+          <Lines items={summary} />
         </figcaption>
       </figure>
     </Card>

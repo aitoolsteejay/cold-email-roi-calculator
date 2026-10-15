@@ -4,6 +4,7 @@ import { MEETINGS_PER_1000_REFERENCE, type Currency } from "@/data/coldEmailBenc
 import type { RoiResult } from "@/lib/coldEmailRoi";
 import { formatCount, formatMoney } from "@/lib/format";
 import { InfoTip } from "./InfoTip";
+import { Lines } from "./Lines";
 import { SourcesPopover } from "./SourcesPopover";
 
 interface StatProps {
@@ -59,12 +60,13 @@ export function StatRow({ result, currency, hasInvestment }: Props) {
           help="Meetings booked for every 1,000 prospects reached with the full sequence."
         />
       </div>
-      <p className="flex items-start gap-1 text-xs leading-snug text-muted-foreground">
-        <span>
-          <span className="font-semibold text-foreground/70">Published benchmark:</span> {MEETINGS_PER_1000_REFERENCE.text}
-        </span>
-        <SourcesPopover title="Meetings per 1,000 emails" sources={[MEETINGS_PER_1000_REFERENCE.source]} />
-      </p>
+      <div className="flex items-start gap-1 text-xs leading-snug text-muted-foreground">
+        <div>
+          <p className="font-semibold text-foreground/70">Meetings per 1,000, for comparison:</p>
+          <Lines items={MEETINGS_PER_1000_REFERENCE.lines} />
+        </div>
+        <SourcesPopover title="Meetings per 1,000" sources={[MEETINGS_PER_1000_REFERENCE.source]} />
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <Stat icon={Wallet} color="#F5B731" label="Cost per booked meeting" value={money(result.costPerBookedMeeting)} help="Total investment / meetings booked." />
         <Stat icon={Receipt} color="#F5B731" label="Cost per customer" value={money(result.costPerCustomer)} help="Total investment / deals closed." />

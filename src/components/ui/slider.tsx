@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 
 export const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & { thumbLabel?: string; thumbLabelledBy?: string; valueText?: string }
->(({ className, thumbLabel, thumbLabelledBy, valueText, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> & { thumbLabel?: string; thumbLabelledBy?: string; thumbDescribedBy?: string; valueText?: string }
+>(({ className, thumbLabel, thumbLabelledBy, thumbDescribedBy, valueText, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
     className={cn("relative flex w-full touch-none select-none items-center cursor-pointer py-2", className)}
@@ -18,6 +18,7 @@ export const Slider = React.forwardRef<
     <SliderPrimitive.Thumb
       aria-label={thumbLabel}
       aria-labelledby={thumbLabelledBy}
+      aria-describedby={thumbDescribedBy}
       aria-valuetext={valueText}
       className="relative block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 before:absolute before:-inset-3 before:content-['']"
     />

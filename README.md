@@ -35,6 +35,23 @@ The visitor fills in one volume box: emails per day or new prospects per month, 
 
 The funnel runs on prospects: bounce and reply rates are per prospect, across the whole sequence.
 
+Revenue is paid month by month. A customer won in month m starts paying in month m + sales cycle lag and pays deal value x invoices per year / 12 every month until their retention period ends. Only payments inside the chosen duration count, so customers won late in the plan add less.
+
+## Default rates
+
+The sliders start at Myntmore's own 2026 Smartlead averages (pulled 15 October 2026, stored in `BENCHMARKS[*].myntmore` and `MYNTMORE_2026`):
+
+| Rate | Default | From |
+|---|---|---|
+| Bounce | 3.7% | 456 bounces / 12,453 prospects, all 17 campaigns of 2026 |
+| Reply | 3.8% | 256 replies / 6,657 delivered prospects, 10 completed campaigns (auto replies left out) |
+| Positive share | 59% | 151 positive / 256 replies |
+| Meeting booking | 47% | 71 meeting requests / 151 positive replies |
+| Show-up | 75% | Published benchmark (not tracked in Smartlead) |
+| Close | 12% | Published benchmark (not tracked in Smartlead) |
+
+To refresh them, update those numbers in `src/data/coldEmailBenchmarks.ts`.
+
 For 7,500 prospects a month that is 13 domains and 52 ids. Month 1 reaches 2,080 prospects with 4,420 emails, month 2 reaches 5,820 with 19,680, and month 3 onward reaches 7,500 with 30,000 a month.
 
 ## Moving it into the Next.js site

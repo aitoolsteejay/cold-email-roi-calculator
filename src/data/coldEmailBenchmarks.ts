@@ -37,10 +37,13 @@ export interface MetricBenchmark {
   unit: "%";
   /** Short label for the funnel step the percentage applies to. */
   appliesTo: string;
-  /** Starting value for the slider: the published platform average. */
+  /** Starting value for the slider: Myntmore's 2026 average where Smartlead tracks it, else the published average. */
   defaultValue: number;
+  /** Myntmore's own 2026 Smartlead average, when Smartlead tracks this step. */
+  myntmore?: { value: number; detail: string[] };
   bands: Band[];
-  typicalRange: string;
+  /** Published benchmark, one short line per fact. */
+  typicalRange: string[];
   sources: BenchmarkSource[];
   slider: { min: number; max: number; step: number };
   /**
@@ -58,13 +61,14 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
     label: "Bounce rate",
     unit: "%",
     appliesTo: "of prospects",
-    defaultValue: 1.5,
+    defaultValue: 3.7,
+    myntmore: { value: 3.7, detail: ["456 bounces from 12,453 prospects", "All 17 campaigns of 2026"] },
     bands: [
       { label: "Healthy", min: 0, max: 2, tone: "good" },
       { label: "Watch", min: 2, max: 4, tone: "warn" },
       { label: "Too high", min: 4, max: Infinity, tone: "bad" },
     ],
-    typicalRange: "Keep under 2%. Typical sender is 1.54%. Above 4% hurts sender reputation",
+    typicalRange: ["Keep under 2%", "Typical sender: 1.54%", "Above 4% hurts sender reputation"],
     sources: [
       {
         name: "Smartlead",
@@ -85,7 +89,11 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
     label: "Reply rate",
     unit: "%",
     appliesTo: "of delivered prospects",
-    defaultValue: 3.4,
+    defaultValue: 3.8,
+    myntmore: {
+      value: 3.8,
+      detail: ["256 replies from 6,657 delivered prospects", "10 completed campaigns of 2026", "Out of office and auto replies left out"],
+    },
     bands: [
       { label: "Below average", min: 0, max: 2, tone: "warn" },
       { label: "Average", min: 2, max: 3.5, tone: "average" },
@@ -93,7 +101,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Top quartile", min: 5.5, max: 10, tone: "great" },
       { label: "Elite", min: 10, max: Infinity, tone: "great" },
     ],
-    typicalRange: "2 to 3.5% average, 5.5% top quartile, 10%+ elite",
+    typicalRange: ["Average: 2 to 3.5%", "Top quartile: 5.5%", "Elite: 10%+"],
     sources: [
       {
         name: "Instantly 2026 benchmark report",
@@ -125,13 +133,14 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
     label: "Positive reply share",
     unit: "%",
     appliesTo: "of replies",
-    defaultValue: 40,
+    defaultValue: 59,
+    myntmore: { value: 59, detail: ["151 positive of 256 replies", "Meeting request, information request, interested"] },
     bands: [
       { label: "Low", min: 0, max: 30, tone: "warn" },
       { label: "Average", min: 30, max: 50, tone: "average" },
       { label: "Strong", min: 50, max: Infinity, tone: "great" },
     ],
-    typicalRange: "30 to 50% of replies are positive",
+    typicalRange: ["30 to 50% of replies are positive"],
     sources: [
       {
         name: "Saleshandy via EmailBison",
@@ -154,13 +163,14 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
     label: "Meeting booking rate",
     unit: "%",
     appliesTo: "of positive replies",
-    defaultValue: 40,
+    defaultValue: 47,
+    myntmore: { value: 47, detail: ["71 meeting requests of 151 positive replies", "Smartlead tracks requests, not calendar bookings"] },
     bands: [
       { label: "Low", min: 0, max: 30, tone: "warn" },
       { label: "Average", min: 30, max: 50, tone: "average" },
       { label: "Strong", min: 50, max: Infinity, tone: "great" },
     ],
-    typicalRange: "20 to 50% of positive replies become meetings",
+    typicalRange: ["20 to 50% of positive replies become meetings"],
     sources: [
       {
         name: "JoinSync",
@@ -189,7 +199,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Average", min: 70, max: 85, tone: "average" },
       { label: "Strong", min: 85, max: Infinity, tone: "great" },
     ],
-    typicalRange: "About 80%, top teams 85%+",
+    typicalRange: ["About 80%", "Top teams: 85%+"],
     sources: [
       {
         name: "Leadhaste",
@@ -218,8 +228,7 @@ export const BENCHMARKS: Record<MetricKey, MetricBenchmark> = {
       { label: "Average", min: 10, max: 20, tone: "average" },
       { label: "Strong", min: 20, max: Infinity, tone: "great" },
     ],
-    typicalRange:
-      "Qualified opportunities close at about 21% on average. First meetings from cold outreach close lower, often 8 to 15%",
+    typicalRange: ["Qualified opportunities: about 21%", "First meetings from cold outreach: 8 to 15%"],
     sources: [
       {
         name: "Prospeo",
@@ -292,7 +301,6 @@ export type VolumeMode = "emails" | "prospects";
 
 export interface CalculatorState {
   currency: string;
-  industry: string | null;
   /** Which volume box the visitor fills in. The other is calculated. */
   volumeMode: VolumeMode;
   /** Emails per day at full speed, used when volumeMode is "emails". */
@@ -316,7 +324,6 @@ export interface CalculatorState {
 
 export const DEFAULT_STATE: CalculatorState = {
   currency: "USD",
-  industry: null,
   volumeMode: "emails",
   dailyEmailTarget: 1000,
   monthlyProspectTarget: 7500,
@@ -367,12 +374,28 @@ export const SENDING_SOP = {
   secondBatchMonth: 2,
 } as const;
 
+/** Where the Myntmore defaults come from. Pulled from Smartlead on 15 October 2026. */
+export const MYNTMORE_2026 = {
+  source: "Myntmore Smartlead campaigns, January to October 2026",
+  campaigns: 17,
+  completedCampaigns: 10,
+  prospects: 12453,
+  summary: [
+    "Defaults use Myntmore's own 2026 Smartlead campaigns",
+    "Show-up and close rates are not tracked in Smartlead, so they use published benchmarks",
+  ],
+};
+
 /* ------------------------------------------------------------------ */
 /* Derived checks and reference lines                                  */
 /* ------------------------------------------------------------------ */
 
 export const MEETINGS_PER_1000_REFERENCE = {
-  text: "Well run campaigns land 4 to 10 meetings per 1,000 emails (Modern Inbound). Enterprise 3 to 8, mid market 5 to 15, SMB 10 to 25 (Cleverly).",
+  lines: [
+    "Myntmore 2026: 10.2 meeting requests per 1,000 prospects",
+    "Well run campaigns: 4 to 10 per 1,000 emails (Modern Inbound)",
+    "Enterprise 3 to 8, mid market 5 to 15, SMB 10 to 25 (Cleverly)",
+  ],
   source: {
     name: "Modern Inbound",
     url: "https://moderninbound.com/blog/cold-email-conversion-rate-benchmarks",
@@ -381,8 +404,8 @@ export const MEETINGS_PER_1000_REFERENCE = {
 };
 
 export const POSITIVE_REPLY_RATE_REFERENCE = {
-  formulaLabel: "Positive reply rate = reply rate x share",
-  context: "Average 0.5 to 1.0%, top 10% 1.5 to 3.0% (Puzzle Inbox).",
+  formulaLabel: "Positive reply rate (reply rate x share)",
+  lines: ["Myntmore 2026: 2.3%", "Average: 0.5 to 1.0%", "Top 10%: 1.5 to 3.0% (Puzzle Inbox)"],
   source: {
     name: "Puzzle Inbox",
     url: "https://puzzleinbox.com/blog/cold-email-reply-rate-benchmarks-2026-by-segment",
@@ -391,7 +414,7 @@ export const POSITIVE_REPLY_RATE_REFERENCE = {
 };
 
 export const COST_REFERENCE = {
-  text: "Well run programs cost about $100 to $300 per qualified meeting (Prospeo). Top cost per meeting seen is about $152 (Instantly).",
+  lines: ["Typical: $100 to $300 per qualified meeting (Prospeo)", "Best seen: about $152 per meeting (Instantly)"],
   sources: [
     { name: "Prospeo", url: "https://prospeo.io/s/email-outreach-qa", note: "Cost per qualified meeting" },
     {
@@ -411,23 +434,26 @@ export interface IndustryRow {
   label: string;
   replyMin: number;
   replyMax: number;
-  /** Display text, null when the source gives no figure. */
-  positiveReplyRange: string | null;
+  positiveReplyRange: string;
+  /** True when no figure is published and the lowest range in the table is used instead. */
+  positiveReplyEstimated?: boolean;
 }
 
 export const INDUSTRIES: IndustryRow[] = [
   { key: "saas", label: "B2B SaaS / Software", replyMin: 2, replyMax: 4, positiveReplyRange: "1-2%" },
   { key: "services", label: "B2B Services and Agencies", replyMin: 2, replyMax: 6, positiveReplyRange: "0.8-1.5%" },
-  { key: "it", label: "IT Services and MSPs", replyMin: 3, replyMax: 4, positiveReplyRange: null },
+  { key: "it", label: "IT Services and MSPs", replyMin: 3, replyMax: 4, positiveReplyRange: "0.3-0.7%", positiveReplyEstimated: true },
   { key: "manufacturing", label: "Manufacturing and Industrial", replyMin: 1.5, replyMax: 5, positiveReplyRange: "0.5-1.0%" },
   { key: "healthcare", label: "Healthcare and MedTech", replyMin: 1.5, replyMax: 6, positiveReplyRange: "0.5-1.0%" },
   { key: "finance", label: "Financial Services", replyMin: 2, replyMax: 4, positiveReplyRange: "0.7-1.2%" },
   { key: "education", label: "Education / EdTech", replyMin: 1.5, replyMax: 7, positiveReplyRange: "0.5-1.0%" },
   { key: "ecommerce", label: "E-commerce / DTC / Consumer", replyMin: 1, replyMax: 4, positiveReplyRange: "0.8-1.5%" },
   { key: "realestate", label: "Real Estate", replyMin: 1.5, replyMax: 7, positiveReplyRange: "0.5-1.0%" },
-  { key: "legal", label: "Legal", replyMin: 8, replyMax: 10, positiveReplyRange: null },
+  { key: "legal", label: "Legal", replyMin: 8, replyMax: 10, positiveReplyRange: "0.3-0.7%", positiveReplyEstimated: true },
   { key: "government", label: "Government / Public sector", replyMin: 1, replyMax: 2, positiveReplyRange: "0.3-0.7%" },
 ];
+
+export const INDUSTRY_ESTIMATE_NOTE = "No published figure. The lowest range in this table is used.";
 
 export const INDUSTRY_NOTE =
   "Ranges across published 2026 sources. Your results depend on list quality, offer and deliverability.";

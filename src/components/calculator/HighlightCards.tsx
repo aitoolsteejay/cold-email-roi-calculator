@@ -35,7 +35,8 @@ export function HighlightCards({ result, currency, hasDealValue, hasInvestment, 
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Revenue Generated</p>
             <InfoTip label="Total revenue">
-              Deals closed inside the duration x effective LTV, over {durationMonths} months.
+              Each customer pays deal value x invoices per year / 12 every month, from the month they are won until retention ends. Only
+              payments inside the {durationMonths} months count.
             </InfoTip>
           </div>
           <p className="text-3xl font-black break-words" style={{ color: GOLD.text }}>

@@ -87,9 +87,9 @@ export function NumberField({
         />
       </div>
       {hint && (
-        <p id={hintId} className="text-xs text-muted-foreground">
+        <div id={hintId} className="text-xs text-muted-foreground">
           {hint}
-        </p>
+        </div>
       )}
     </div>
   );

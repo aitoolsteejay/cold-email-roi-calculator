@@ -3,8 +3,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { HandUnderline, PillBadge } from "@/components/site/HandUnderline";
-import { BENCHMARKS, DURATION_OPTIONS, FOOTNOTE, INDUSTRIES, RATE_ORDER } from "@/data/coldEmailBenchmarks";
-import { bookedPerProspect } from "@/lib/coldEmailRoi";
+import { BENCHMARKS, DURATION_OPTIONS, FOOTNOTE, RATE_ORDER } from "@/data/coldEmailBenchmarks";
 import { exportResultsPdf } from "@/lib/exportPdf";
 import { formatInteger, formatPercent, getCurrency } from "@/lib/format";
 import { ConversionFunnel } from "./ConversionFunnel";
@@ -12,30 +11,30 @@ import { GrowthChart } from "./GrowthChart";
 import { HighlightCards } from "./HighlightCards";
 import { IndustryBenchmarks } from "./IndustryBenchmarks";
 import { InputsPanel } from "./InputsPanel";
-import { SendingRampCard } from "./SendingRampCard";
+import { SendingPlanSection } from "./SendingPlanSection";
 import { StatRow } from "./StatRow";
 import { useColdEmailCalculator } from "./useColdEmailCalculator";
 
 export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: string }) {
   const api = useColdEmailCalculator();
-  const { state, result, rampPlan } = api;
+  const { state, result } = api;
   const currency = getCurrency(state.currency);
   const hasDealValue = (state.dealValue ?? 0) > 0;
   const hasInvestment = (state.monthlyInvestment ?? 0) > 0;
+  const rampRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
-    if (!resultsRef.current) return;
+    const sections = [rampRef.current, resultsRef.current].filter((el): el is HTMLDivElement => el !== null);
+    if (sections.length === 0) return;
     setExporting(true);
     try {
       const money = (v: number | null) => (v === null ? "not set" : `${currency.code} ${formatInteger(v, currency.locale)}`);
-      const industry = INDUSTRIES.find((i) => i.key === state.industry)?.label;
-      await exportResultsPdf(resultsRef.current, {
+      await exportResultsPdf(sections, {
         title: "Cold Email ROI Report",
         subtitle: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
         assumptions: [
-          ...(industry ? [`Industry: ${industry}`] : []),
           `Full speed: ${formatInteger(result.plan.prospectsPerMonth, currency.locale)} prospects/month, ${formatInteger(result.plan.emailsPerDay, currency.locale)} emails/day`,
           `Domains: ${formatInteger(result.plan.domains, currency.locale)}  |  Ids: ${formatInteger(result.plan.ids, currency.locale)}  |  4 emails per prospect`,
           `Duration: ${DURATION_OPTIONS.find((d) => d.months === state.durationMonths)?.label ?? `${state.durationMonths} months`}`,
@@ -72,6 +71,8 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
         </Button>
       </div>
 
+      <SendingPlanSection ref={rampRef} api={api} />
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <InputsPanel api={api} />
@@ -83,15 +84,8 @@ export function ColdEmailRoiCalculator({ logoSrc = "/logo.png" }: { logoSrc?: st
             <StatRow result={result} currency={currency} hasInvestment={hasInvestment} />
             <ConversionFunnel result={result} currency={currency} />
             <GrowthChart result={result} currency={currency} hasInvestment={hasInvestment} />
-            <SendingRampCard
-              rampPlan={rampPlan}
-              durationPlan={result.plan}
-              durationMonths={state.durationMonths}
-              bookedPerProspect={bookedPerProspect(state)}
-              locale={currency.locale}
-            />
           </div>
-          <IndustryBenchmarks selected={state.industry} />
+          <IndustryBenchmarks />
           <p className="text-xs leading-relaxed text-muted-foreground">{FOOTNOTE}</p>
         </div>
       </div>

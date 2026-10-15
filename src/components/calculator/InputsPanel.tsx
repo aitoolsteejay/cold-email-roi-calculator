@@ -3,32 +3,21 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  COST_REFERENCE,
-  CURRENCIES,
-  DURATION_OPTIONS,
-  INDUSTRIES,
-  MODEL,
-  POSITIVE_REPLY_RATE_REFERENCE,
-} from "@/data/coldEmailBenchmarks";
+import { COST_REFERENCE, CURRENCIES, MODEL, MYNTMORE_2026, POSITIVE_REPLY_RATE_REFERENCE } from "@/data/coldEmailBenchmarks";
 import { stageCounts } from "@/lib/coldEmailRoi";
 import { formatCount, formatMoney, formatPercent, getCurrency } from "@/lib/format";
 import { InfoTip } from "./InfoTip";
 import { NumberField } from "./NumberField";
+import { Lines } from "./Lines";
 import { RateSlider } from "./RateSlider";
-import { VolumeInput } from "./VolumeInput";
 import { SourcesPopover } from "./SourcesPopover";
 import type { CalculatorApi } from "./useColdEmailCalculator";
 
-const NO_INDUSTRY = "none";
-
 export function InputsPanel({ api }: { api: CalculatorApi }) {
-  const { state, update, setRate, setVolumeMode, reset, result } = api;
-  const plan = result.plan;
+  const { state, update, setRate, reset, result } = api;
   const currency = getCurrency(state.currency);
   const locale = currency.locale;
   const counts = stageCounts(result, state.bounceRate);
-  const industry = INDUSTRIES.find((i) => i.key === state.industry) ?? null;
   const positiveReplyRate = (state.replyRate * state.positiveShare) / 100;
 
   return (
@@ -42,7 +31,7 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
       </div>
 
       <div className="space-y-8">
-        {/* Volume */}
+        {/* Currency */}
         <div className="space-y-4 border-b border-border pb-6">
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
@@ -62,62 +51,13 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
               </SelectContent>
             </Select>
           </div>
-
-          <VolumeInput
-            mode={state.volumeMode}
-            onModeChange={setVolumeMode}
-            dailyEmailTarget={state.dailyEmailTarget}
-            monthlyProspectTarget={state.monthlyProspectTarget}
-            onChange={(mode, v) => update(mode === "emails" ? "dailyEmailTarget" : "monthlyProspectTarget", v)}
-            plan={plan}
-            locale={locale}
-          />
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="duration" className="font-semibold">Duration</Label>
-              <InfoTip label="Duration">How many months of outreach to project. Cost and revenue are counted over this period.</InfoTip>
-            </div>
-            <Select value={String(state.durationMonths)} onValueChange={(v) => update("durationMonths", Number(v))}>
-              <SelectTrigger id="duration">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DURATION_OPTIONS.map((d) => (
-                  <SelectItem key={d.months} value={String(d.months)}>
-                    {d.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         {/* Rates */}
         <div className="space-y-5">
           <div className="space-y-1">
             <h3 className="font-semibold text-foreground">Funnel Rates</h3>
-            <p className="text-xs leading-snug text-muted-foreground">Sliders start at the 2026 platform average. Set each one to your own numbers.</p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="industry" className="text-sm font-medium">Industry (optional)</Label>
-              <InfoTip label="Industry">Does not change the math. Highlights your row in the industry table and shows its reply range under the reply rate slider.</InfoTip>
-            </div>
-            <Select value={state.industry ?? NO_INDUSTRY} onValueChange={(v) => update("industry", v === NO_INDUSTRY ? null : v)}>
-              <SelectTrigger id="industry">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_INDUSTRY}>Any industry</SelectItem>
-                {INDUSTRIES.map((i) => (
-                  <SelectItem key={i.key} value={i.key}>
-                    {i.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Lines className="text-xs leading-snug text-muted-foreground" items={MYNTMORE_2026.summary} />
           </div>
 
           <RateSlider metric="bounceRate" value={state.bounceRate} onChange={(v) => setRate("bounceRate", v)} count={counts.bounceRate} countNoun="prospects bounced" locale={locale} />
@@ -129,21 +69,15 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
             count={counts.replyRate}
             countNoun="replies"
             locale={locale}
-            extraCaption={
-              industry && (
-                <span>
-                  <span className="font-semibold text-foreground/70">{industry.label}:</span> {formatPercent(industry.replyMin, locale)} to{" "}
-                  {formatPercent(industry.replyMax, locale)} reply rate
-                </span>
-              )
-            }
           />
 
           <RateSlider metric="positiveShare" value={state.positiveShare} onChange={(v) => setRate("positiveShare", v)} count={counts.positiveShare} countNoun="positive replies" locale={locale}>
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-md bg-secondary/60 px-2 py-1.5 text-[11px] leading-snug">
-              <span className="font-semibold">{POSITIVE_REPLY_RATE_REFERENCE.formulaLabel}:</span>
-              <span className="font-bold text-foreground">{formatPercent(positiveReplyRate, locale)}</span>
-              <span className="text-muted-foreground">{POSITIVE_REPLY_RATE_REFERENCE.context}</span>
+            <div className="rounded-md bg-secondary/60 px-2 py-1.5 text-[11px] leading-snug">
+              <p>
+                <span className="font-semibold">{POSITIVE_REPLY_RATE_REFERENCE.formulaLabel}:</span>{" "}
+                <span className="font-bold text-foreground">{formatPercent(positiveReplyRate, locale)}</span>
+              </p>
+              <Lines className="mt-0.5 text-muted-foreground" items={POSITIVE_REPLY_RATE_REFERENCE.lines} />
             </div>
           </RateSlider>
 
@@ -211,7 +145,7 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
             <div className="flex items-center justify-between gap-3 rounded-lg border border-accent/20 bg-accent/10 p-3">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-semibold">Effective LTV (for duration)</span>
-                <InfoTip label="Effective LTV">Customer value that falls inside the chosen duration. Uses the shorter of duration and retention.</InfoTip>
+                <InfoTip label="Effective LTV">The most one customer can pay inside the chosen duration (a customer won in month 1). Uses the shorter of duration and retention.</InfoTip>
               </div>
               <span className="shrink-0 text-lg font-bold text-accent">{formatMoney(result.effectiveLTV, currency)}</span>
             </div>
@@ -226,10 +160,10 @@ export function InputsPanel({ api }: { api: CalculatorApi }) {
             prefix={currency.symbol}
             placeholder="e.g. 2,500"
             hint={
-              <span className="inline-flex items-start gap-1">
-                <span>{COST_REFERENCE.text}</span>
+              <div className="flex items-start gap-1">
+                <Lines items={COST_REFERENCE.lines} />
                 <SourcesPopover title="Cost per meeting" sources={COST_REFERENCE.sources} />
-              </span>
+              </div>
             }
           />
         </div>

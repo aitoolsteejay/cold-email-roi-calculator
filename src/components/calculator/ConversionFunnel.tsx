@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import type { Currency } from "@/data/coldEmailBenchmarks";
 import type { RoiResult } from "@/lib/coldEmailRoi";
 import { formatCount, formatInteger, formatMoney, formatPercent } from "@/lib/format";
+import { Lines } from "./Lines";
 
 const BAR_STYLE = {
   background: "linear-gradient(135deg, rgb(255,201,71) 0%, rgb(255,182,39) 50%, rgb(255,165,0) 100%)",
@@ -31,10 +32,17 @@ export function ConversionFunnel({ result, currency }: { result: RoiResult; curr
   return (
     <Card className="p-5 sm:p-6">
       <h3 className="mb-1 text-center text-2xl font-black text-foreground">Conversion Funnel</h3>
-      <p className="mx-auto mb-8 max-w-xl text-center text-sm text-muted-foreground">
-        {formatInteger(result.sent, loc)} emails to {formatInteger(result.prospects, loc)} prospects. Bars show share of prospects reached.
-        Brackets show conversion from the step above.
-      </p>
+      <Lines
+        className="mx-auto mb-8 max-w-xl text-center text-sm text-muted-foreground"
+        items={[
+          <>
+            <strong className="text-foreground">{formatInteger(result.sent, loc)}</strong> emails to{" "}
+            <strong className="text-foreground">{formatInteger(result.prospects, loc)}</strong> prospects
+          </>,
+          "Bars: share of prospects reached",
+          "Brackets: conversion from the step above",
+        ]}
+      />
       <ol className="mx-auto w-full max-w-2xl space-y-2">
         {stages.map((s, i) => {
           const prev = i === 0 ? null : stages[i - 1].value;

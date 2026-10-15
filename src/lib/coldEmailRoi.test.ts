@@ -45,6 +45,12 @@ describe("volume inputs", () => {
 describe("sending plan", () => {
   const plan = calculateSendingPlan(7500, 4);
 
+  it("records ids added and warm-up per month", () => {
+    expect(plan.months[0]).toMatchObject({ idsAdded: 26, warmupUntilDay: 14, idsSendingAtEnd: 26 });
+    expect(plan.months[1]).toMatchObject({ idsAdded: 26, warmupUntilDay: 14, idsSendingAtEnd: 52 });
+    expect(plan.months[2]).toMatchObject({ idsAdded: 0, warmupUntilDay: 0, idsSendingAtEnd: 52 });
+  });
+
   it("month 1: warm-up to day 14, then 26 ids start 130 prospects a day", () => {
     expect(plan.months[0].segments).toEqual([
       { fromDay: 1, toDay: 14, idsSending: 0, newProspectsPerDay: 0 },
@@ -82,8 +88,31 @@ describe("calculateRoi", () => {
     expect(Math.round(r.booked)).toBe(444);
     expect(Math.round(r.held)).toBe(333);
     expect(r.deals).toBeCloseTo(39.98, 2);
-    expect(r.revenue).toBeCloseTo(r.deals * 12000, 6);
     expect(r.cost).toBe(30000);
+  });
+
+  it("pays revenue month by month, so customers won late add less", () => {
+    const r = calculateRoi(base);
+    const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
+    const prospectsByMonth = [2080, 5820, ...Array(10).fill(7500)];
+    // $1,000 x 12 invoices / 12 = $1,000 a month per customer, paid from the month won to month 12.
+    const expected = prospectsByMonth.reduce((t, p, i) => t + p * perProspect * 1000 * (12 - i), 0);
+    expect(r.revenue).toBeCloseTo(expected, 6);
+    expect(r.revenue).toBeLessThan(r.deals * r.effectiveLTV);
+    // Cumulative chart line ends at the headline revenue.
+    expect(r.monthly[11].revenue).toBeCloseTo(r.revenue, 6);
+  });
+
+  it("stops payments at the end of the retention period", () => {
+    const r = calculateRoi({ ...base, retentionMonths: 3, durationMonths: 3 });
+    const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
+    // Month 1 customers pay 3 months, month 2 customers 2, month 3 customers 1.
+    expect(r.revenue).toBeCloseTo(perProspect * 1000 * (2080 * 3 + 5820 * 2 + 7500 * 1), 6);
+  });
+
+  it("does not pay back in month 1 when nothing sends until day 15", () => {
+    const r = calculateRoi({ ...base, monthlyInvestment: 20000 });
+    expect(r.paybackMonth).not.toBe(1);
   });
 
   it("builds meetings month by month from ramped prospects, not full speed", () => {
@@ -122,6 +151,11 @@ describe("calculateRoi", () => {
     const r = calculateRoi({ ...base, salesCycleLagMonths: 3 });
     const countedShare = (2080 + 5820 + 7 * 7500) / r.prospects;
     expect(r.dealsCounted).toBeCloseTo(r.deals * countedShare, 6);
+    // Month 1 customers start paying in month 4, so they pay 9 months inside the 12.
+    const perProspect = 0.985 * 0.034 * 0.4 * 0.4 * 0.75 * 0.12;
+    const prospectsByMonth = [2080, 5820, ...Array(7).fill(7500)];
+    const expected = prospectsByMonth.reduce((t, p, i) => t + p * perProspect * 1000 * (12 - (i + 3)), 0);
+    expect(r.revenue).toBeCloseTo(expected, 6);
   });
 
   it("sanitises bad input", () => {
@@ -132,7 +166,8 @@ describe("calculateRoi", () => {
 });
 
 describe("helpers", () => {
-  it("default rates give about 5.4 meetings per 1,000 prospects", () => {
-    expect(meetingsPer1000Prospects(DEFAULT_STATE)).toBeCloseTo(5.4, 1);
+  it("Myntmore 2026 defaults reproduce the Smartlead meeting request rate", () => {
+    // Smartlead 2026: 71 meeting requests from 6,983 prospects in completed campaigns = 10.2 per 1,000.
+    expect(meetingsPer1000Prospects(DEFAULT_STATE)).toBeCloseTo(10.15, 1);
   });
 });

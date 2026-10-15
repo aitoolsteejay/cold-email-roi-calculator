@@ -37,13 +37,13 @@ export interface PdfMeta {
   logoSrc: string;
 }
 
-export async function exportResultsPdf(element: HTMLElement, meta: PdfMeta) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+type Html2Canvas = (typeof import("html2canvas"))["default"];
 
-  const scale = 2;
-  // Card edges, in canvas pixels, where a page break will not cut through content.
+/** Render one section and record its card edges, so page breaks fall between cards. */
+async function capture(html2canvas: Html2Canvas, element: HTMLElement, scale: number) {
   const rootTop = element.getBoundingClientRect().top;
   const breakpoints = Array.from(element.querySelectorAll<HTMLElement>(":scope > *, :scope > * > *"))
+    .filter((el) => !el.parentElement?.closest("[data-pdf-keep]"))
     .map((el) => (el.getBoundingClientRect().bottom - rootTop) * scale)
     .sort((a, b) => a - b);
 
@@ -60,12 +60,24 @@ export async function exportResultsPdf(element: HTMLElement, meta: PdfMeta) {
       });
     },
   });
+  return { canvas, breakpoints };
+}
+
+/** Export one or more page sections, in order, under a header with the logo and the assumptions. */
+export async function exportResultsPdf(elements: HTMLElement[], meta: PdfMeta) {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+
+  const scale = 2;
+  const sections = [];
+  for (const el of elements) sections.push(await capture(html2canvas, el, scale));
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
   const margin = 12;
   const contentW = pageW - margin * 2;
+  const bottom = pageH - margin - 8;
+  const gap = 4;
 
   const paintBackground = () => {
     pdf.setFillColor(...CREAM);
@@ -111,34 +123,43 @@ export async function exportResultsPdf(element: HTMLElement, meta: PdfMeta) {
   });
   y += half * 4.2 + 3;
 
-  // Results image, sliced across pages when taller than one page.
-  const pxPerMm = canvas.width / contentW;
-  let srcY = 0;
-  let first = true;
-  while (srcY < canvas.height) {
-    const top = first ? y : margin;
-    const availMm = pageH - top - margin - 8;
-    const maxSlice = Math.floor(availMm * pxPerMm);
-    let slicePx = Math.min(canvas.height - srcY, maxSlice);
-    if (srcY + slicePx < canvas.height) {
-      const clean = breakpoints.filter((b) => b > srcY + maxSlice * 0.4 && b <= srcY + maxSlice).pop();
-      if (clean) slicePx = Math.ceil(clean - srcY + 4 * scale);
+  const newPage = () => {
+    pdf.addPage();
+    paintBackground();
+    y = margin;
+  };
+
+  // Each section continues on the current page and is sliced at card edges when it runs over.
+  for (const { canvas, breakpoints } of sections) {
+    const pxPerMm = canvas.width / contentW;
+    let srcY = 0;
+    while (srcY < canvas.height) {
+      let maxSlice = Math.floor((bottom - y) * pxPerMm);
+      // Too little room left for even the first card: start a fresh page.
+      const firstBreak = breakpoints.find((b) => b > srcY) ?? canvas.height;
+      if (maxSlice < Math.min(firstBreak - srcY, canvas.height - srcY) && y > margin) {
+        newPage();
+        maxSlice = Math.floor((bottom - y) * pxPerMm);
+      }
+      let slicePx = Math.min(canvas.height - srcY, maxSlice);
+      if (srcY + slicePx < canvas.height) {
+        const clean = breakpoints.filter((b) => b > srcY + maxSlice * 0.3 && b <= srcY + maxSlice).pop();
+        if (clean) slicePx = Math.ceil(clean - srcY + 4 * scale);
+      }
+      const slice = document.createElement("canvas");
+      slice.width = canvas.width;
+      slice.height = slicePx;
+      const ctx = slice.getContext("2d");
+      if (!ctx) break;
+      ctx.fillStyle = CREAM_HEX;
+      ctx.fillRect(0, 0, slice.width, slice.height);
+      ctx.drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+      pdf.addImage(slice.toDataURL("image/jpeg", 0.85), "JPEG", margin, y, contentW, slicePx / pxPerMm);
+      y += slicePx / pxPerMm;
+      srcY += slicePx;
+      if (srcY < canvas.height) newPage();
     }
-    const slice = document.createElement("canvas");
-    slice.width = canvas.width;
-    slice.height = slicePx;
-    const ctx = slice.getContext("2d");
-    if (!ctx) break;
-    ctx.fillStyle = CREAM_HEX;
-    ctx.fillRect(0, 0, slice.width, slice.height);
-    ctx.drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
-    pdf.addImage(slice.toDataURL("image/jpeg", 0.85), "JPEG", margin, top, contentW, slicePx / pxPerMm);
-    srcY += slicePx;
-    if (srcY < canvas.height) {
-      pdf.addPage();
-      paintBackground();
-      first = false;
-    }
+    y += gap;
   }
 
   // Footnote on every page.

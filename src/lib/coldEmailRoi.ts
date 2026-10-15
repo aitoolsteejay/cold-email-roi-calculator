@@ -48,6 +48,12 @@ export interface SendSegment {
 
 export interface SendMonth {
   month: number;
+  /** Ids added to Smartlead on day 1 of this month. They warm up and cannot send yet. */
+  idsAdded: number;
+  /** Last warm-up day for the ids added this month, or 0 when none were added. */
+  warmupUntilDay: number;
+  /** Ids sending on the last day of the month. */
+  idsSendingAtEnd: number;
   /** New prospects who got their first email this month. */
   prospects: number;
   /** All emails sent this month: first emails plus follow ups. */
@@ -111,7 +117,7 @@ function div(a: number, b: number): number | null {
   return b > 0 && Number.isFinite(a / b) ? a / b : null;
 }
 
-/** Share of emails sent that survive each funnel step, as a fraction (not a percent). */
+/** Share of prospects reached that end up as a deal, as a fraction (not a percent). */
 function funnelFraction(i: RoiInputs): number {
   const p = (v: number) => safeRate(v) / 100;
   return (
@@ -135,12 +141,12 @@ export function calculateLtv(i: Pick<RoiInputs, "dealValue" | "invoicesPerYear" 
   };
 }
 
-/** Meetings booked per 1,000 prospects reached, from the rates alone. */
 /** Meetings booked for each prospect reached. Multiply by a month's prospects to get that month's meetings. */
 export function bookedPerProspect(i: Pick<RoiInputs, "bounceRate" | "replyRate" | "positiveShare" | "bookingRate">): number {
   return meetingsPer1000Prospects(i) / 1000;
 }
 
+/** Meetings booked per 1,000 prospects reached, from the rates alone. */
 export function meetingsPer1000Prospects(i: Pick<RoiInputs, "bounceRate" | "replyRate" | "positiveShare" | "bookingRate">): number {
   const p = (v: number) => safeRate(v) / 100;
   return 1000 * (1 - p(i.bounceRate)) * p(i.replyRate) * p(i.positiveShare) * p(i.bookingRate);
@@ -166,17 +172,20 @@ export function calculateRoi(raw: RoiInputs): RoiResult {
   const fraction = funnelFraction(raw);
   const cost = monthlyInvestment * months;
 
-  // Month by month. Deals closed in month m are paid out in month m + lag; anything past the duration is dropped.
-  const dealsClosedInMonth: number[] = [];
-  plan.months.forEach((m) => dealsClosedInMonth.push(m.prospects * fraction));
+  // Month by month. Deals from the prospects reached in month m start paying in month m + lag.
+  // Each customer then pays deal value x invoices per year / 12 every month for the retention period.
+  // Only payments inside the duration count, so a customer won late in the plan adds less revenue.
+  const retention = Math.floor(safeNumber(raw.retentionMonths));
+  const perCustomerPerMonth = (safeNumber(raw.dealValue) * safeNumber(raw.invoicesPerYear)) / 12;
   const revenueInMonth: number[] = new Array(months).fill(0);
   let dealsCounted = 0;
-  dealsClosedInMonth.forEach((d, idx) => {
-    const payoutMonth = idx + 1 + lag;
-    if (payoutMonth <= months) {
-      revenueInMonth[payoutMonth - 1] += d * effectiveLTV;
-      dealsCounted += d;
-    }
+  plan.months.forEach((m, idx) => {
+    const dealsWon = m.prospects * fraction;
+    const firstPayMonth = idx + 1 + lag;
+    if (firstPayMonth > months) return;
+    dealsCounted += dealsWon;
+    const lastPayMonth = Math.min(months, firstPayMonth + retention - 1);
+    for (let pay = firstPayMonth; pay <= lastPayMonth; pay++) revenueInMonth[pay - 1] += dealsWon * perCustomerPerMonth;
   });
 
   const monthly: MonthPoint[] = [];
@@ -266,6 +275,7 @@ export function calculateSendingPlan(monthlyProspectTarget: number, durationMont
     const segments: SendSegment[] = [];
     let prospects = 0;
     let sent = 0;
+    const idsAdded = (m === 1 ? firstBatch : 0) + (m === sop.secondBatchMonth ? secondBatch : 0);
     for (let dayOfMonth = 1; dayOfMonth <= sop.daysPerMonth; dayOfMonth++) {
       const day = (m - 1) * sop.daysPerMonth + dayOfMonth;
       const idsSending = (day >= firstLiveDay ? firstBatch : 0) + (day >= secondLiveDay ? secondBatch : 0);
@@ -280,7 +290,8 @@ export function calculateSendingPlan(monthlyProspectTarget: number, durationMont
       if (last && last.idsSending === idsSending && last.newProspectsPerDay === fresh) last.toDay = dayOfMonth;
       else segments.push({ fromDay: dayOfMonth, toDay: dayOfMonth, idsSending, newProspectsPerDay: fresh });
     }
-    plan.push({ month: m, prospects, sent, segments });
+    const idsSendingAtEnd = segments[segments.length - 1]?.idsSending ?? 0;
+    plan.push({ month: m, idsAdded, warmupUntilDay: idsAdded > 0 ? sop.warmupDays : 0, idsSendingAtEnd, prospects, sent, segments });
   }
 
   return {
