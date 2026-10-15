@@ -3,7 +3,6 @@ import { SENDING_SOP } from "@/data/coldEmailBenchmarks";
 import type { SendMonth, SendingPlan } from "@/lib/coldEmailRoi";
 import { formatInteger } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Lines } from "./Lines";
 
 interface MonthCard {
   title: string;
@@ -28,59 +27,93 @@ function cardsFor(plan: SendingPlan): MonthCard[] {
   return cards;
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <div className="text-sm leading-snug text-foreground">{children}</div>
-    </div>
-  );
+type Kind = "warmup" | "first" | "followup";
+
+const KINDS: Record<Kind, { label: string; className: string }> = {
+  warmup: { label: "Warm-up", className: "bg-muted-foreground/25" },
+  first: { label: "First emails", className: "bg-primary" },
+  followup: { label: "Follow-ups", className: "bg-[#16a34a]/70" },
+};
+
+interface Segment {
+  kind: Kind;
+  /** Days within the month, 1 to 30. */
+  from: number;
+  to: number;
+  detail: string;
 }
 
-/** What the campaigns do in a month: last month's follow ups finishing, then any new list launched. */
-function campaignLines(plan: SendingPlan, month: SendMonth, locale: string): string[] {
+/** What happens on which days of a month, for the timeline bar. */
+function segmentsFor(plan: SendingPlan, month: SendMonth, locale: string): Segment[] {
   const days = SENDING_SOP.daysPerMonth;
-  const monthStart = (month.month - 1) * days + 1;
-  const monthEnd = month.month * days;
+  const start = (month.month - 1) * days + 1;
+  const end = month.month * days;
+  const local = (abs: number) => abs - start + 1;
   const n = (v: number) => formatInteger(v, locale);
-  const dayOf = (abs: number) => abs - (Math.ceil(abs / days) - 1) * days;
-  // "day 8" in this month, "next month, day 8" after it.
-  const when = (abs: number) => {
-    const m = Math.ceil(abs / days);
-    if (m === month.month) return `day ${dayOf(abs)}`;
-    return m === month.month + 1 ? `next month, day ${dayOf(abs)}` : `month ${m}, day ${dayOf(abs)}`;
-  };
-  // "days 15 to 20" inside one month, "day 20 to next month, day 8" across months.
-  const range = (from: number, to: number) =>
-    Math.ceil(from / days) === Math.ceil(to / days) && Math.ceil(from / days) === month.month
-      ? from === to
-        ? `day ${dayOf(from)}`
-        : `days ${dayOf(from)} to ${dayOf(to)}`
-      : `${when(from)} to ${when(to)}`;
-  const lines: string[] = [];
+  const segs: Segment[] = [];
 
   const firstLaunch = plan.campaigns[0]?.launchDay ?? Infinity;
-  if (firstLaunch > monthStart && firstLaunch <= monthEnd + 1) {
-    lines.push(`Days 1 to ${Math.min(dayOf(firstLaunch - 1), days)}: ids warm up, nothing sent`);
+  if (firstLaunch > start && firstLaunch <= end + 1) {
+    segs.push({ kind: "warmup", from: 1, to: local(firstLaunch - 1), detail: `Days 1 to ${local(firstLaunch - 1)}: ids warm up, nothing is sent` });
   }
 
   for (const c of plan.campaigns) {
-    if (c.launchDay < monthStart && c.followUpsTo !== null && c.followUpsTo >= monthStart) {
-      const launchedIn = Math.ceil(c.launchDay / days);
-      const whose = launchedIn === month.month - 1 ? "last month's list" : `month ${launchedIn}'s list`;
-      lines.push(`Days 1 to ${dayOf(Math.min(c.followUpsTo, monthEnd))}: follow ups for ${whose}`);
+    const firstFrom = Math.max(c.firstEmailsFrom, start);
+    const firstTo = Math.min(c.firstEmailsTo, end);
+    if (firstFrom <= firstTo) {
+      segs.push({
+        kind: "first",
+        from: local(firstFrom),
+        to: local(firstTo),
+        detail: `Days ${local(firstFrom)} to ${local(firstTo)}: first emails to all ${n(c.listSize)} prospects, up to ${n(c.firstEmailsPerDay)} a day`,
+      });
     }
-  }
-
-  for (const c of plan.campaigns.filter((x) => x.launchDay >= monthStart && x.launchDay <= monthEnd)) {
-    const allIds = c.ids === plan.ids ? `all ${n(c.ids)} ids` : `${n(c.ids)} ids`;
-    lines.push(`Day ${dayOf(c.launchDay)}: new list of ${n(c.listSize)} prospects on ${allIds}`);
-    lines.push(`First emails to all of them: ${range(c.firstEmailsFrom, c.firstEmailsTo)} (up to ${n(c.firstEmailsPerDay)} a day)`);
     if (c.followUpsFrom !== null && c.followUpsTo !== null) {
-      lines.push(`Then ${SENDING_SOP.emailsPerProspect - 1} follow ups, ${SENDING_SOP.followUpGapDays} days apart: ${range(c.followUpsFrom, c.followUpsTo)}`);
+      // Drawn from the day after the first emails finish, so the two never overlap on the bar.
+      const fuFrom = Math.max(c.followUpsFrom, c.firstEmailsTo + 1, start);
+      const fuTo = Math.min(c.followUpsTo, end);
+      if (fuFrom <= fuTo) {
+        segs.push({
+          kind: "followup",
+          from: local(fuFrom),
+          to: local(fuTo),
+          detail: `Days ${local(fuFrom)} to ${local(fuTo)}: follow ups${c.launchDay < start ? " for last month's list" : ""}`,
+        });
+      }
     }
   }
-  return lines;
+  return segs.sort((a, b) => a.from - b.from);
+}
+
+function Timeline({ segments }: { segments: Segment[] }) {
+  const days = SENDING_SOP.daysPerMonth;
+  const launch = SENDING_SOP.warmupDays + 1;
+  return (
+    <div>
+      <div className="relative h-3 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
+        {segments.map((s) => (
+          <div
+            key={`${s.kind}-${s.from}`}
+            title={s.detail}
+            className={cn("absolute inset-y-0", KINDS[s.kind].className)}
+            style={{ left: `${((s.from - 1) / days) * 100}%`, width: `${((s.to - s.from + 1) / days) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="relative mt-1 h-3 text-[10px] text-muted-foreground" aria-hidden="true">
+        <span className="absolute left-0">Day 1</span>
+        <span className="absolute -translate-x-1/2" style={{ left: `${((launch - 0.5) / days) * 100}%` }}>
+          {launch}
+        </span>
+        <span className="absolute right-0">{days}</span>
+      </div>
+      <ul className="sr-only">
+        {segments.map((s) => (
+          <li key={`${s.kind}-${s.from}`}>{s.detail}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 interface Props {
@@ -90,11 +123,8 @@ interface Props {
   locale: string;
 }
 
-/** The ramp month by month: domains, ids added, warm-up, who is sending, and that month's prospects and emails. */
-export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRamp(
-  { rampPlan, durationPlan, durationMonths, locale },
-  ref,
-) {
+/** The ramp month by month: a 30 day bar showing warm-up, first emails and follow-ups, plus that month's totals. */
+export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRamp({ rampPlan, durationPlan, durationMonths, locale }, ref) {
   const n = (v: number) => formatInteger(v, locale);
 
   if (rampPlan.domains === 0) {
@@ -106,49 +136,48 @@ export const SendingRamp = forwardRef<HTMLDivElement, Props>(function SendingRam
   }
 
   const cards = cardsFor(rampPlan);
+  const launchDay = SENDING_SOP.warmupDays + 1;
 
   return (
-    <div ref={ref} className="space-y-4">
+    <div ref={ref} className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {(Object.keys(KINDS) as Kind[]).map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span className={cn("h-2.5 w-2.5 rounded-full", KINDS[k].className)} aria-hidden="true" />
+            {KINDS[k].label}
+          </span>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {cards.map(({ title, month, ongoing }) => {
+          const idsLine =
+            month.month === 1
+              ? `${n(month.idsAdded)} ids, live from day ${launchDay}`
+              : month.idsAdded > 0
+                ? `+${n(month.idsAdded)} ids, live from day ${launchDay}`
+                : `All ${n(month.idsSendingAtEnd)} ids sending`;
           return (
             <div key={title} className={cn("flex flex-col rounded-xl border p-4", ongoing ? "border-[#16a34a]/30 bg-[#16a34a]/5" : "border-border bg-secondary/20")}>
-              <h4 className="mb-3 text-base font-black text-foreground">{title}</h4>
-              <div className="flex-1 space-y-3">
-                <Section label="Domains">
-                  {month.month === 1 ? `${n(rampPlan.domains)} bought on day 1` : `${n(rampPlan.domains)} live`}
-                </Section>
-                <Section label="Ids">
-                  {month.idsAdded > 0 ? (
-                    <Lines
-                      items={[
-                        `${n(month.idsAdded)} added on day 1 (${n(month.idsAdded / rampPlan.domains)} per domain)`,
-                        `Warming up: days 1 to ${month.warmupUntilDay}`,
-                      ]}
-                    />
-                  ) : (
-                    `All ${n(month.idsSendingAtEnd)} ids live`
-                  )}
-                </Section>
-                <Section label="Campaigns">
-                  <Lines className="space-y-1" items={campaignLines(rampPlan, month, locale)} />
-                </Section>
-              </div>
-              <div className="mt-4 border-t border-border pt-3">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {ongoing ? "Every month" : "This month"}
+              <div className="mb-3">
+                <h4 className="text-base font-black text-foreground">{title}</h4>
+                <p className="text-xs text-muted-foreground">
+                  {n(rampPlan.domains)} domains · {idsLine}
                 </p>
-                <dl className="space-y-1 text-sm">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <dt className="text-muted-foreground">New prospects</dt>
-                    <dd className="font-bold text-foreground">{n(month.prospects)}</dd>
-                  </div>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <dt className="text-muted-foreground">Emails sent</dt>
-                    <dd className="font-bold text-foreground">{n(month.sent)}</dd>
-                  </div>
-                </dl>
               </div>
+
+              <Timeline segments={segmentsFor(rampPlan, month, locale)} />
+
+              <dl className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="text-muted-foreground">New prospects{ongoing ? " a month" : ""}</dt>
+                  <dd className="font-bold text-foreground">{n(month.prospects)}</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <dt className="text-muted-foreground">Emails sent{ongoing ? " a month" : ""}</dt>
+                  <dd className="font-bold text-foreground">{n(month.sent)}</dd>
+                </div>
+              </dl>
             </div>
           );
         })}
